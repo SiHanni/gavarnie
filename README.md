@@ -1,3 +1,5 @@
+<img src="./images/gavarnie.png" alt="메인 로고" width="100"/>
+
 영상 소셜 네트워크 프로젝트 "Gavarnie"
 
 프랑스에서 가장 높은 폭포인 가바니에서 이름을 따온 영상 소셜 네트워크입니다.
