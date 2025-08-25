@@ -8,8 +8,8 @@
     "infra"
   ],
   "scripts": {
-    "dev:api": "yarn workspace api start:dev",
-    "dev:worker": "yarn workspace worker start:dev"
+    "dev:api": "NODE_ENV=development yarn workspace api start:dev",
+    "dev:worker": "NODE_ENV=development yarn workspace worker start:dev"
   },
   "packageManager": "yarn@4.9.3"
 }
