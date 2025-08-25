@@ -1,0 +1,15 @@
+{
+  "name": "gavarnie",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "web",
+    "infra"
+  ],
+  "scripts": {
+    "dev:api": "yarn workspace api start:dev",
+    "dev:worker": "yarn workspace worker start:dev"
+  },
+  "packageManager": "yarn@4.9.3"
+}
