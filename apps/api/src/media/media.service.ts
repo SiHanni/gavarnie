@@ -69,4 +69,18 @@ export class MediaService {
 
     return { ok: true };
   }
+
+  async getStatus(id: string) {
+    const media = await this.repo.findOne({ where: { id } });
+    if (!media) return { exists: false };
+    return {
+      exists: true,
+      id: media.id,
+      status: media.status,
+      srcKey: media.srcKey,
+      hlsKey: media.hlsKey,
+      size: media.size,
+      updatedAt: media.updatedAt,
+    };
+  }
 }

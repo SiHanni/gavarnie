@@ -28,6 +28,12 @@ services:
     container_name: gavarnie-redis
     ports:
       - '16379:6379'
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 0
+      --maxmemory-policy noeviction
+      --notify-keyspace-events Ex
 
   minio:
     image: minio/minio:latest
