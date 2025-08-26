@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HealthModule } from './health/health.module';
+import { TranscodeProcessor } from './transcode.processor';
 
 @Module({
   imports: [
@@ -25,5 +26,6 @@ import { HealthModule } from './health/health.module';
     MongooseModule.forRoot(process.env.MONGO_URI || ''),
     HealthModule,
   ],
+  providers: [TranscodeProcessor],
 })
 export class AppModule {}
