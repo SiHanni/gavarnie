@@ -83,4 +83,8 @@ export class MediaService {
       updatedAt: media.updatedAt,
     };
   }
+
+  async findOne(id: string) {
+    return this.repo.findOne({ where: { id } });
+  }
 }

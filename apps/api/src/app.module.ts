@@ -4,7 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HealthModule } from './health/health.module';
 import { MediaModule } from './media/media.module';
-import { Media } from './media/media.entity';
+import { Media } from '@gavarnie/entities';
 
 @Module({
   imports: [
@@ -23,8 +23,10 @@ import { Media } from './media/media.entity';
         entities: [Media],
         autoLoadEntities: true,
         synchronize: true,
+        logging: true,
       }),
     }),
+    TypeOrmModule.forFeature([Media]),
     MongooseModule.forRoot(process.env.MONGO_URI || ''),
     HealthModule,
     MediaModule,
