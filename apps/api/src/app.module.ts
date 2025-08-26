@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HealthModule } from './health/health.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -18,12 +19,13 @@ import { HealthModule } from './health/health.module';
         username: process.env.MYSQL_USER,
         password: process.env.MYSQL_PASSWORD,
         database: process.env.MYSQL_DB,
-        autoLoadEntities: false,
-        synchronize: false,
+        autoLoadEntities: true,
+        synchronize: true,
       }),
     }),
     MongooseModule.forRoot(process.env.MONGO_URI || ''),
     HealthModule,
+    MediaModule,
   ],
 })
 export class AppModule {}
