@@ -8,12 +8,12 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePresignDto {
-  @ApiProperty({ example: 'sample.mov' })
+  @ApiProperty({ example: 'f1-radio.mp3' })
   @IsString()
   @IsNotEmpty()
   originalFilename!: string;
 
-  @ApiProperty({ example: 'video/quicktime' })
+  @ApiProperty({ example: 'audio/mpeg' })
   @IsMimeType()
   contentType!: string;
 

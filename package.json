@@ -5,11 +5,16 @@
   "workspaces": [
     "apps/*",
     "web",
-    "infra"
+    "infra",
+    "libs/*"
   ],
   "scripts": {
-    "dev:api": "NODE_ENV=development yarn workspace api start:dev",
-    "dev:worker": "NODE_ENV=development yarn workspace worker start:dev"
+    "build": "tsc -b -v",
+    "build:clean": "rimraf apps/**/dist libs/**/dist",
+    "dev:api": "NODE_ENV=development yarn workspace @gavarnie/api start:dev",
+    "dev:worker": "NODE_ENV=development yarn workspace @gavarnie/worker start:dev",
+    "dev:entities:watch": "yarn workspace @gavarnie/entities build:watch",
+    "dev:all": "yarn workspace @gavarnie/entities build && concurrently -n ENTITIES,API,WORKER -c auto \"yarn workspace @gavarnie/entities build:watch\" \"yarn workspace @gavarnie/api start:dev\" \"yarn workspace @gavarnie/worker start:dev\""
   },
   "packageManager": "yarn@4.9.3"
 }
