@@ -1,39 +1,65 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
-import { S3Service } from '../storage/s3.service';
-import { Media } from './media.entity';
-import { Inject } from '@nestjs/common';
-import { TRANSCODE_QUEUE } from '../queue/queue.module';
 import { Queue } from 'bullmq';
+import { v4 as uuidv4 } from 'uuid';
+import { HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Service } from '../storage/s3.service';
+import { Media } from '@gavarnie/entities';
+import { TRANSCODE_QUEUE } from '../queue/queue.module';
 import { MEDIA_EXTS } from './exts';
+import * as path from 'path';
 
 @Injectable()
 export class MediaService {
+  private readonly logger = new Logger(MediaService.name);
+
   constructor(
     @InjectRepository(Media) private readonly repo: Repository<Media>,
     private readonly s3: S3Service,
     @Inject(TRANSCODE_QUEUE) private readonly transcodeQueue: Queue,
   ) {}
 
+  /**
+   * 업로드 대상의 mime 판단 (audio/video)
+   * @param contentType
+   * @param filename
+   * @returns
+   */
   private ensureAllowed(contentType: string, filename: string) {
-    const ct = (contentType || '').toLowerCase();
-    if (ct.startsWith('video/') || ct.startsWith('audio/')) return;
+    const mime = String(contentType ?? '')
+      .trim()
+      .toLowerCase();
+    const isMediaMime = mime.startsWith('video/') || mime.startsWith('audio/');
+    if (isMediaMime) return;
 
-    // 브라우저가 MIME을 못 주는 경우(application/octet-stream)만 확장자로 보조 판단
-    const ext = (filename.split('.').pop() || '').toLowerCase();
-    if (ct === 'application/octet-stream' && MEDIA_EXTS.has(ext)) return;
+    // 브라우저가 MIME을 못 주는 경우에 한해(=octet-stream) 확장자 보조 판정
+    const isGenericMime = mime === 'application/octet-stream';
+    if (isGenericMime) {
+      // filename 안전 파싱: 경로 제거 → 마지막 점 기준 확장자 추출 → 소문자화
+      const base = path.basename(String(filename ?? ''));
+      const dot = base.lastIndexOf('.');
+      const ext = dot >= 0 ? base.slice(dot + 1).toLowerCase() : '';
 
-    throw new BadRequestException('Only audio/video files are allowed');
+      if (MEDIA_EXTS.has(ext)) return;
+
+      throw new BadRequestException('Only audio/video files are allowed');
+    }
   }
 
+  /**
+   * Presigned URL 생성 API
+   * @param originalFilename
+   * @param contentType
+   * @returns
+   */
   async createPresign(originalFilename: string, contentType: string) {
     this.ensureAllowed(contentType, originalFilename);
 
     const id = uuidv4();
-
-    const key = `original/${id}`;
+    const safeName = originalFilename.replace(/[^\w.\-()+\[\]{}@]/g, '_');
+    const key = `original/${id}/${safeName}`;
 
     const media = this.repo.create({
       id,
@@ -44,16 +70,52 @@ export class MediaService {
     });
     await this.repo.save(media);
 
-    const presign = await this.s3.presignedPut(key, contentType);
-    return { mediaId: media.id, ...presign };
+    try {
+      const presign = await this.s3.presignedPut(key, contentType);
+      return { mediaId: media.id, ...presign };
+    } catch (error) {
+      this.logger?.warn?.(
+        `presign failed: id=${id} key=${key} ct=${contentType}`,
+      );
+      throw error;
+    }
   }
 
+  /**
+   * 업로드 완료 후 DB 레코드 갱신, HLS 변환 워커 큐 적재
+   * @param mediaId
+   * @param key
+   * @param size
+   * @returns
+   */
   async completeUpload(mediaId: string, key: string, size?: number) {
     const media = await this.repo.findOne({ where: { id: mediaId } });
     if (!media) throw new BadRequestException('media not found');
     if (media.srcKey !== key) throw new BadRequestException('key mismatch');
 
-    media.size = size ?? null;
+    // 이미 적재된 상태면 중복 적재 방지
+    if (['QUEUED', 'PROCESSING', 'READY'].includes(media.status)) {
+      return { ok: true, id: media.id, status: media.status };
+    }
+
+    // HEAD로 실제 존재/사이즈 확인
+    // (S3Service 내부 필드 접근이 필요하면 public getter 제공하거나 여기서 S3Client, bucket 주입받도록 리팩토링 권장)
+    const anyS3 = this.s3 as any as {
+      bucket: string;
+      s3: import('@aws-sdk/client-s3').S3Client;
+    };
+    const head = await anyS3.s3.send(
+      new HeadObjectCommand({
+        Bucket: anyS3.bucket,
+        Key: key,
+      }),
+    );
+    const actualSize = head.ContentLength ?? 0;
+    if (!actualSize || actualSize <= 0) {
+      throw new BadRequestException('object not found or zero size');
+    }
+
+    media.size = actualSize ?? null;
     media.status = 'QUEUED';
     await this.repo.save(media);
 
@@ -61,13 +123,14 @@ export class MediaService {
       'hls',
       { mediaId: media.id, srcKey: media.srcKey },
       {
+        jobId: media.id,
         removeOnComplete: true,
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
       },
     );
 
-    return { ok: true };
+    return { ok: true, id: media.id, status: media.status };
   }
 
   async getStatus(id: string) {

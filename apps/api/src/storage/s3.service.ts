@@ -22,7 +22,11 @@ export class S3Service {
       10,
     );
   }
-
+  /**
+   * presigned URL 생성 서비스
+   * @key: original/${mediaId}
+   * @contentType: 'audio' || 'video'
+   */
   async presignedPut(key: string, contentType: string) {
     const cmd = new PutObjectCommand({
       Bucket: this.bucket,
@@ -30,9 +34,11 @@ export class S3Service {
       ContentType: contentType,
     });
     const url = await getSignedUrl(this.s3, cmd, { expiresIn: this.expires });
+
     const publicUrl = this.publicBase
-      ? `${this.publicBase}/${encodeURIComponent(key)}`
+      ? encodeURI(`${this.publicBase}/${key}`)
       : null;
+
     return {
       url,
       method: 'PUT' as const,
