@@ -10,8 +10,26 @@ CREATE TABLE IF NOT EXISTS users (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS media (
+  id CHAR(36) PRIMARY KEY,                               -- UUID (TypeORM: @PrimaryGeneratedColumn('uuid'))
+  original_filename VARCHAR(255) NOT NULL,
+  content_type VARCHAR(128) NOT NULL,
+  src_key VARCHAR(512) NOT NULL,                         -- 예: original/{id}.mp4
+  status ENUM('UPLOADING','QUEUED','PROCESSING','READY','FAILED') NOT NULL DEFAULT 'UPLOADING',
+  size BIGINT NULL,
+  hls_key VARCHAR(512) NULL,                             -- 예: hls/{id}/index.m3u8
+  error TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 인덱스 (상태별 최신 조회, HLS 필터링)
+CREATE INDEX idx_media_status_updated_id ON media (status, updated_at DESC, id DESC);
+CREATE INDEX idx_media_hls_key ON media (hls_key);
+
 CREATE TABLE IF NOT EXISTS media_core (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  media_id CHAR(36) NOT NULL,                            -- FK → media(id)
   owner_id BIGINT NOT NULL,
   status ENUM('draft','processing','published','rejected') NOT NULL DEFAULT 'processing',
   title VARCHAR(200) NOT NULL,
@@ -22,11 +40,16 @@ CREATE TABLE IF NOT EXISTS media_core (
   dislike_count INT NOT NULL DEFAULT 0,
   comment_count INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (owner_id) REFERENCES users(id)
+  CONSTRAINT fk_media_core_media
+    FOREIGN KEY (media_id) REFERENCES media(id),
+  CONSTRAINT fk_media_core_owner
+    FOREIGN KEY (owner_id) REFERENCES users(id),
+  CONSTRAINT uq_media_core_media UNIQUE (media_id)       -- 1:1 매핑 가정 시 유니크 권장
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_media_status_pub ON media_core(status, published_at DESC);
-CREATE INDEX idx_media_owner_created ON media_core(owner_id, created_at DESC);
+-- 피드/조회 최적화 인덱스
+CREATE INDEX idx_media_status_pub ON media_core (status, published_at DESC);
+CREATE INDEX idx_media_owner_created ON media_core (owner_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS reactions (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
