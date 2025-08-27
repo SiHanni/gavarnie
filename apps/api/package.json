@@ -10,6 +10,8 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
     "@aws-sdk/s3-request-presigner": "^3.873.0",
+    "@bull-board/api": "^6.12.6",
+    "@bull-board/express": "^6.12.6",
     "@gavarnie/entities": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
