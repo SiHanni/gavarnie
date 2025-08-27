@@ -174,7 +174,7 @@ export class MediaService {
     // ORDER BY updatedAt DESC, id DESC 를 쓰므로, where:
     // (updatedAt < cursor.updatedAt) OR (updatedAt = cursor.updatedAt AND id < cursor.id)
     const qb = this.repo
-      .createQueryBuilder('m')
+      .createQueryBuilder('media')
       .select([
         'media.id',
         'media.hlsKey',
