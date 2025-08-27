@@ -22,7 +22,7 @@ import { Media } from '@gavarnie/entities';
         database: process.env.MYSQL_DB,
         entities: [Media],
         autoLoadEntities: true,
-        synchronize: true,
+        synchronize: false,
         logging: true,
       }),
     }),

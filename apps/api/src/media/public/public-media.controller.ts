@@ -1,13 +1,14 @@
-// apps/api/src/media/public/public-media.controller.ts
 import {
   Controller,
   Get,
   Param,
   HttpException,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { MediaService } from '../media.service';
+import { RecentQueryDto, RecentResponseDto } from '../dto/recent.dto';
 
 @ApiTags('media')
 @Controller('media')
@@ -42,5 +43,14 @@ export class PublicMediaController {
 
     const streamUrl = `${base.replace(/\/+$/, '')}/${media.hlsKey}`;
     return { id: media.id, status: media.status, streamUrl };
+  }
+
+  @Get('recent')
+  @ApiOperation({
+    summary: 'READY 상태 미디어 목록 (최근 기준, 커서 기반 페이지네이션)',
+  })
+  @ApiOkResponse({ type: RecentResponseDto })
+  async getRecent(@Query() query: RecentQueryDto): Promise<RecentResponseDto> {
+    return this.mediaService.getRecent(query);
   }
 }
