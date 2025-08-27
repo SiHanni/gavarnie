@@ -124,7 +124,7 @@ export class MediaService {
       { mediaId: media.id, srcKey: media.srcKey },
       {
         jobId: media.id,
-        removeOnComplete: true,
+        removeOnComplete: false, // 로컬 개발 중에는 성공하더라도 큐를 삭제하지 않도록 = false
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
       },
@@ -136,6 +136,11 @@ export class MediaService {
   async getStatus(id: string) {
     const media = await this.repo.findOne({ where: { id } });
     if (!media) return { exists: false };
+
+    if (media.status !== 'READY') {
+      throw new BadRequestException(`Media not ready (status=${media.status})`);
+    }
+
     return {
       exists: true,
       id: media.id,
