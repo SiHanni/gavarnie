@@ -23,6 +23,7 @@ export const s3 = new S3Client({
 
 export async function downloadToFile(key: string, toPath: string) {
   const obj = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  console.log(`download file: ${obj}`);
   await pipe(obj.Body as any, createWriteStream(toPath));
 }
 

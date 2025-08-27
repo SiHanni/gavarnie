@@ -10,6 +10,12 @@ import { Media } from '@gavarnie/entities';
 import { TRANSCODE_QUEUE } from '../queue/queue.module';
 import { MEDIA_EXTS } from './exts';
 import * as path from 'path';
+import { decodeCursor, encodeCursor } from './utils/cursor.util';
+import {
+  RecentQueryDto,
+  RecentResponseDto,
+  RecentMediaNode,
+} from './dto/recent.dto';
 
 @Injectable()
 export class MediaService {
@@ -154,5 +160,69 @@ export class MediaService {
 
   async findOne(id: string) {
     return this.repo.findOne({ where: { id } });
+  }
+
+  /**
+   * READY 상태인 컨텐츠 목록 반환
+   * 커서 조건: (updatedAt, id) 튜플의 "엄격히 이전"만 가져오기
+   *
+   */
+  async getRecent(dto: RecentQueryDto): Promise<RecentResponseDto> {
+    const limit = dto.limit ?? 20;
+    const cursor = decodeCursor(dto.cursor);
+
+    // ORDER BY updatedAt DESC, id DESC 를 쓰므로, where:
+    // (updatedAt < cursor.updatedAt) OR (updatedAt = cursor.updatedAt AND id < cursor.id)
+    const qb = this.repo
+      .createQueryBuilder('m')
+      .select([
+        'media.id',
+        'media.hlsKey',
+        'media.originalFilename',
+        'media.contentType',
+        'media.size',
+        'media.updatedAt',
+      ])
+      .where('media.status = :ready', { ready: 'READY' })
+      .andWhere('media.hlsKey IS NOT NULL')
+      .orderBy('media.updatedAt', 'DESC')
+      .addOrderBy('media.id', 'DESC')
+      .limit(limit + 1); // hasNextPage 판단용으로 하나 더 가져오기
+
+    if (cursor) {
+      const cursorDate = new Date(cursor.updatedAt);
+      if (isNaN(cursorDate.getTime())) {
+        throw new BadRequestException('Invalid cursor');
+      }
+      qb.andWhere(
+        '(media.updatedAt < :cud) OR (media.updatedAt = :cud AND media.id < :cid)',
+        { cud: cursorDate, cid: cursor.id },
+      );
+    }
+
+    const rows = await qb.getMany();
+    const hasNextPage = rows.length > limit;
+    const pageRows = hasNextPage ? rows.slice(0, limit) : rows;
+
+    const nodes: RecentMediaNode[] = pageRows.map((m) => ({
+      id: m.id,
+      hlsKey: m.hlsKey!,
+      originalFilename: m.originalFilename,
+      contentType: m.contentType,
+      size: m.size ?? null,
+      updatedAt: m.updatedAt.toISOString(),
+    }));
+
+    const endCursor = pageRows.length
+      ? encodeCursor({
+          updatedAt: pageRows[pageRows.length - 1].updatedAt.toISOString(),
+          id: pageRows[pageRows.length - 1].id,
+        })
+      : null;
+
+    return {
+      nodes,
+      pageInfo: { endCursor, hasNextPage },
+    };
   }
 }

@@ -15,33 +15,38 @@ export type MediaStatus =
 
 @Entity({ name: 'media' })
 export class Media {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id!: string;
 
-  @Column({ length: 255 })
+  @Column({ name: 'original_filename', type: 'varchar', length: 255 })
   originalFilename!: string;
 
-  @Column({ length: 128 })
+  @Column({ name: 'content_type', type: 'varchar', length: 128 })
   contentType!: string;
 
-  @Column({ length: 512 })
+  @Column({ name: 'src_key', type: 'varchar', length: 512 })
   srcKey!: string; // 예: original/{id}.mp4
 
-  @Column({ type: 'varchar', length: 32, default: 'UPLOADING' })
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: ['UPLOADING', 'QUEUED', 'PROCESSING', 'READY', 'FAILED'],
+    default: 'UPLOADING',
+  })
   status!: MediaStatus;
 
-  @Column({ type: 'bigint', nullable: true })
+  @Column({ name: 'size', type: 'bigint', nullable: true })
   size!: number | null;
 
-  @Column({ type: 'varchar', length: 512, nullable: true })
+  @Column({ name: 'hls_key', type: 'varchar', length: 512, nullable: true })
   hlsKey!: string | null; // 예: hls/{id}/index.m3u8
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'error', type: 'text', nullable: true })
   error!: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at', type: 'datetime' })
   updatedAt!: Date;
 }
