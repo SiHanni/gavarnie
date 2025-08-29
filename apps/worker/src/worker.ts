@@ -3,7 +3,7 @@ import { DataSource, Repository } from 'typeorm';
 import { Worker, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
 import { transcodeToHLS } from './transcode';
-import { Media } from '@gavarnie/entities';
+import { User, Media, MediaCore } from '@gavarnie/entities';
 
 type JobData = { mediaId: string; srcKey: string };
 const QUEUE_NAME = 'transcode';
@@ -16,7 +16,7 @@ async function createDataSource() {
     username: process.env.MYSQL_USER || 'root',
     password: process.env.MYSQL_PASSWORD || 'root',
     database: process.env.MYSQL_DB || '',
-    entities: [Media],
+    entities: [User, Media, MediaCore],
     synchronize: false, // 운영 컨벤션 유지
     logging: true, // 필요 시 켜서 디버깅
   });
