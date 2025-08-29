@@ -2,9 +2,11 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { MediaCore } from './media-core.entity';
 
 export type MediaStatus =
   | 'UPLOADING'
@@ -49,4 +51,7 @@ export class Media {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'datetime' })
   updatedAt!: Date;
+
+  @OneToOne(() => MediaCore, mc => mc.media)
+  core!: MediaCore;
 }
