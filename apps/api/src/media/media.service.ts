@@ -1,12 +1,13 @@
-import { Inject } from '@nestjs/common';
+import { ForbiddenException, Inject } from '@nestjs/common';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Queue } from 'bullmq';
 import { v4 as uuidv4 } from 'uuid';
 import { HeadObjectCommand } from '@aws-sdk/client-s3';
 import { S3Service } from '../storage/s3.service';
 import { Media } from '@gavarnie/entities';
+import { MediaCore } from '@gavarnie/entities';
 import { TRANSCODE_QUEUE } from '../queue/queue.module';
 import { MEDIA_EXTS } from './exts';
 import * as path from 'path';
@@ -22,7 +23,11 @@ export class MediaService {
   private readonly logger = new Logger(MediaService.name);
 
   constructor(
-    @InjectRepository(Media) private readonly repo: Repository<Media>,
+    private readonly dataSource: DataSource,
+    @InjectRepository(Media)
+    private readonly mediaRepository: Repository<Media>,
+    @InjectRepository(MediaCore)
+    private readonly mediaCoreRepository: Repository<MediaCore>,
     private readonly s3: S3Service,
     @Inject(TRANSCODE_QUEUE) private readonly transcodeQueue: Queue,
   ) {}
@@ -60,25 +65,53 @@ export class MediaService {
    * @param contentType
    * @returns
    */
-  async createPresign(originalFilename: string, contentType: string) {
+  async createPresign(
+    originalFilename: string,
+    contentType: string,
+    ownerId: string,
+  ) {
     this.ensureAllowed(contentType, originalFilename);
 
     const id = uuidv4();
     const safeName = originalFilename.replace(/[^\w.\-()+\[\]{}@]/g, '_');
     const key = `original/${id}/${safeName}`;
 
-    const media = this.repo.create({
-      id,
-      originalFilename,
-      contentType,
-      srcKey: key,
-      status: 'UPLOADING',
-    });
-    await this.repo.save(media);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction('REPEATABLE READ');
+
+    try {
+      await queryRunner.manager.insert(Media, {
+        id,
+        originalFilename,
+        contentType,
+        srcKey: key,
+        status: 'UPLOADING',
+        size: null,
+        hlsKey: null,
+        error: null,
+      });
+      await queryRunner.manager.insert(MediaCore, {
+        mediaId: id,
+        ownerId, // BIGINT → string으로 다룸
+        status: 'processing',
+        title: originalFilename,
+        description: null,
+        durationSec: null,
+        publishedAt: null,
+      });
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return error;
+    } finally {
+      await queryRunner.release();
+    }
 
     try {
       const presign = await this.s3.presignedPut(key, contentType);
-      return { mediaId: media.id, ...presign };
+      return { mediaId: id, ...presign };
     } catch (error) {
       this.logger?.warn?.(
         `presign failed: id=${id} key=${key} ct=${contentType}`,
@@ -94,8 +127,15 @@ export class MediaService {
    * @param size
    * @returns
    */
-  async completeUpload(mediaId: string, key: string, size?: number) {
-    const media = await this.repo.findOne({ where: { id: mediaId } });
+  async completeUpload(
+    mediaId: string,
+    key: string,
+    ownerId: string,
+    size?: number,
+  ) {
+    const media = await this.mediaRepository.findOne({
+      where: { id: mediaId },
+    });
     if (!media) throw new BadRequestException('media not found');
     if (media.srcKey !== key) throw new BadRequestException('key mismatch');
 
@@ -103,6 +143,13 @@ export class MediaService {
     if (['QUEUED', 'PROCESSING', 'READY'].includes(media.status)) {
       return { ok: true, id: media.id, status: media.status };
     }
+
+    const core = await this.mediaCoreRepository.findOne({
+      where: { mediaId: mediaId },
+    });
+    if (!core) throw new BadRequestException('media_core missing');
+    if (core.ownerId !== ownerId)
+      throw new ForbiddenException('not your media');
 
     // HEAD로 실제 존재/사이즈 확인
     // (S3Service 내부 필드 접근이 필요하면 public getter 제공하거나 여기서 S3Client, bucket 주입받도록 리팩토링 권장)
@@ -123,7 +170,7 @@ export class MediaService {
 
     media.size = actualSize ?? null;
     media.status = 'QUEUED';
-    await this.repo.save(media);
+    await this.mediaRepository.save(media);
 
     await this.transcodeQueue.add(
       'hls',
@@ -140,7 +187,7 @@ export class MediaService {
   }
 
   async getStatus(id: string) {
-    const media = await this.repo.findOne({ where: { id } });
+    const media = await this.mediaRepository.findOne({ where: { id } });
     if (!media) return { exists: false };
 
     if (media.status !== 'READY') {
@@ -159,7 +206,7 @@ export class MediaService {
   }
 
   async findOne(id: string) {
-    return this.repo.findOne({ where: { id } });
+    return this.mediaRepository.findOne({ where: { id } });
   }
 
   /**
@@ -173,7 +220,7 @@ export class MediaService {
 
     // ORDER BY updatedAt DESC, id DESC 를 쓰므로, where:
     // (updatedAt < cursor.updatedAt) OR (updatedAt = cursor.updatedAt AND id < cursor.id)
-    const qb = this.repo
+    const qb = this.mediaRepository
       .createQueryBuilder('media')
       .select([
         'media.id',
