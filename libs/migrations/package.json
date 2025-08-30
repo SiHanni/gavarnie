@@ -1,0 +1,16 @@
+{
+  "name": "@gavarnie/migrations",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "migrate:run": "tsx src/runner/run.ts",
+    "migrate:revert": "tsx src/runner/revert.ts",
+    "migrate:show": "tsx src/runner/show.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mysql2": "^3.11.3",
+    "tsx": "^4.19.2",
+    "typeorm": "^0.3.20"
+  }
+}

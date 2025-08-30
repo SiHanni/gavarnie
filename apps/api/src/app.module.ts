@@ -23,7 +23,7 @@ import { AuthModule } from './auth/auth.module';
         password: process.env.MYSQL_PASSWORD,
         database: process.env.MYSQL_DB,
         entities: [Media, MediaCore],
-        autoLoadEntities: true,
+        autoLoadEntities: false,
         synchronize: false,
         logging: true,
       }),
