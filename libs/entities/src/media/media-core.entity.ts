@@ -1,16 +1,19 @@
 import {
+  Entity,
+  Unique,
+  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  Entity,
-  Index,
+  OneToOne,
   JoinColumn,
   ManyToOne,
-  OneToOne,
-  PrimaryGeneratedColumn,
-  Unique,
+  Index,
+  OneToMany,
 } from 'typeorm';
 import { Media } from './media.entity';
 import { User } from '../user/user.entity';
+import { MediaReaction } from './media-reaction.entity';
+import { Comment } from './comment.entity';
 
 export type MediaCoreStatus = 'draft' | 'processing' | 'published' | 'rejected';
 
@@ -46,15 +49,6 @@ export class MediaCore {
   @Column({ name: 'published_at', type: 'datetime', nullable: true })
   publishedAt!: Date | null;
 
-  @Column({ name: 'like_count', type: 'int', default: 0 })
-  likeCount!: number;
-
-  @Column({ name: 'dislike_count', type: 'int', default: 0 })
-  dislikeCount!: number;
-
-  @Column({ name: 'comment_count', type: 'int', default: 0 })
-  commentCount!: number;
-
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt!: Date;
 
@@ -65,4 +59,10 @@ export class MediaCore {
   @ManyToOne(() => User, u => u.mediaCores, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'owner_id', referencedColumnName: 'id' })
   owner!: User;
+
+  @OneToMany(() => MediaReaction, r => r.mediaCore)
+  reactions!: MediaReaction[];
+
+  @OneToMany(() => Comment, c => c.mediaCore)
+  comments!: Comment[];
 }

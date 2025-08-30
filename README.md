@@ -13,5 +13,3 @@ Monorepo:
 - `apps/worker` : NestJS Worker (BullMQ + FFmpeg 파이프라인)
 - `web` : React/Next.js (플레이어/업로드/피드)
 - `infra` : Docker Compose (MySQL/Mongo/Redis/MinIO/Nginx)
-
-Proceed: 0단계(부트스트랩) → 1단계(인프라) → 2단계(.env) …
