@@ -9,6 +9,8 @@ import type { Queue } from 'bullmq';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
+import { join } from 'path';
+import { readFileSync } from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -38,13 +40,45 @@ async function bootstrap() {
   if (enableSwagger) {
     const config = new DocumentBuilder()
       .setTitle('Gavarnie API')
-      .setDescription('Upload → Transcode(HLS) → Stream pipeline')
+      .setDescription('')
       .setVersion('0.1.0')
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
+        'access-token',
+      )
       .addServer('http://localhost:3000', 'Local')
       .build();
-    const doc = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, doc, {
+    const document = SwaggerModule.createDocument(app, config);
+
+    const appIconPath = join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'images',
+      'appIcon.png',
+    );
+    const appIconBase64 = readFileSync(appIconPath).toString('base64');
+
+    SwaggerModule.setup('docs', app, document, {
       swaggerOptions: { persistAuthorization: true },
+      customSiteTitle: 'Gavarnie Docs',
+      customCss: `
+        .swagger-ui .topbar .link img { display: none !important; }
+        .swagger-ui .topbar .link {
+          display: inline-flex !important;
+          align-items: center !important;
+        }
+        .swagger-ui .topbar .link::before {
+          content: '' !important;
+          display: inline-block !important;
+          width: 55px !important;
+          height: 55px !important;
+          margin-right: 8px !important;
+          background: url('data:image/png;base64,${appIconBase64}') no-repeat center center !important;
+          background-size: contain !important;
+        }
+      `,
     });
   }
 

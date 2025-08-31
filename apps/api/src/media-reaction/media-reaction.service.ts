@@ -28,7 +28,6 @@ export class MediaReactionService {
    * - UNIQUE(mediaUuid, userId) */
   async like(mediaUuid: string, userId: string) {
     const coreId = await this.toCoreIdOrThrow(mediaUuid);
-
     const existing = await this.mediaReactionRepository.findOne({
       where: { mediaCoreId: coreId, userId },
     });
@@ -74,7 +73,6 @@ export class MediaReactionService {
    * - 없으면 no-op */
   async unlike(mediaUuid: string, userId: string) {
     const coreId = await this.toCoreIdOrThrow(mediaUuid);
-
     const existing = await this.mediaReactionRepository.findOne({
       where: { mediaCoreId: coreId, userId },
     });

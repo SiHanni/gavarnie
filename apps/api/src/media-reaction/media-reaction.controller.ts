@@ -6,40 +6,64 @@ import {
   Param,
   UseGuards,
   Req,
+  ParseUUIDPipe,
+  ForbiddenException,
+  Body,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { ApiOperation, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiOkResponse,
+  ApiTags,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
 import { MediaReactionService } from './media-reaction.service';
 import { LikeActionResultDto } from './dto/like-action-result.dto';
 import { LikeCountDto } from './dto/like-count.dto';
 
 @ApiTags('media-reaction')
+@ApiParam({
+  name: 'mediaUuid',
+  description: '미디어 UUID',
+  example: 'db24481c-add2-4ce1-8686-faf87997d404',
+})
 @Controller('media/:mediaUuid')
 export class MediaReactionController {
   constructor(private readonly mediaReactionService: MediaReactionService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post('like')
-  @ApiOperation({ summary: '영상 좋아요 (멱등)' })
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: '영상 좋아요' })
   @ApiOkResponse({ type: LikeActionResultDto })
   async like(
-    @Param('mediaUuid') mediaUuid: string,
+    @Param('mediaUuid', new ParseUUIDPipe({ version: '4' })) mediaUuid: string,
     @Req() req: any,
   ): Promise<LikeActionResultDto> {
-    const userId = String(req.user.id); // JWT 페이로드 구조에 맞게 조정
-    return this.mediaReactionService.like(mediaUuid, userId);
+    const userId = req.user.userId as String;
+    if (!userId) {
+      throw new UnauthorizedException('Authentication required.');
+    }
+    return this.mediaReactionService.like(mediaUuid, String(userId));
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete('like')
-  @ApiOperation({ summary: '영상 좋아요 취소 (멱등)' })
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: '영상 좋아요 취소' })
   @ApiOkResponse({ type: LikeActionResultDto })
   async unlike(
-    @Param('mediaUuid') mediaUuid: string,
+    @Param('mediaUuid', new ParseUUIDPipe({ version: '4' })) mediaUuid: string,
+
     @Req() req: any,
   ): Promise<LikeActionResultDto> {
-    const userId = String(req.user.id);
-    return this.mediaReactionService.unlike(mediaUuid, userId);
+    const userId = req.user.userId as String;
+    if (!userId) {
+      throw new UnauthorizedException('Authentication required.');
+    }
+    return this.mediaReactionService.unlike(mediaUuid, String(userId));
   }
 
   @Get('likes/count')

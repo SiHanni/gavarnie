@@ -17,6 +17,11 @@ import {
   RecentResponseDto,
   RecentMediaNode,
 } from './dto/recent.dto';
+import {
+  Kind,
+  guessContentType,
+  inferKindByExtOrMime,
+} from './utils/media-infer';
 
 @Injectable()
 export class MediaService {
@@ -38,25 +43,37 @@ export class MediaService {
    * @param filename
    * @returns
    */
-  private ensureAllowed(contentType: string, filename: string) {
+  private ensureAllowed(contentType?: string, filename?: string) {
     const mime = String(contentType ?? '')
       .trim()
       .toLowerCase();
-    const isMediaMime = mime.startsWith('video/') || mime.startsWith('audio/');
-    if (isMediaMime) return;
 
-    // 브라우저가 MIME을 못 주는 경우에 한해(=octet-stream) 확장자 보조 판정
-    const isGenericMime = mime === 'application/octet-stream';
+    // 1) MIME이 확실히 미디어면 그대로 허용
+    if (mime.startsWith('video/') || mime.startsWith('audio/')) return;
+
+    // 2) 파일명에서 확장자 추출 (안전 파싱)
+    const base = path.basename(String(filename ?? ''));
+    const dot = base.lastIndexOf('.');
+    const ext = dot >= 0 ? base.slice(dot + 1).toLowerCase() : '';
+
+    // 3) 브라우저/클라이언트가 MIME을 못 주거나 일반형으로 준 경우 → 확장자 보조
+    //    (application/octet-stream, binary/octet-stream, 빈 문자열 등)
+    const isGenericMime =
+      mime === '' ||
+      mime === 'application/octet-stream' ||
+      mime === 'binary/octet-stream';
+
     if (isGenericMime) {
-      // filename 안전 파싱: 경로 제거 → 마지막 점 기준 확장자 추출 → 소문자화
-      const base = path.basename(String(filename ?? ''));
-      const dot = base.lastIndexOf('.');
-      const ext = dot >= 0 ? base.slice(dot + 1).toLowerCase() : '';
-
       if (MEDIA_EXTS.has(ext)) return;
-
       throw new BadRequestException('Only audio/video files are allowed');
     }
+
+    // 4) MIME이 애매하거나 잘못 왔는데, 확장자가 확실한 미디어인 경우
+    //    (예: 일부 환경에서 .mp4인데 text/plain으로 오는 케이스)
+    if (MEDIA_EXTS.has(ext)) return;
+
+    // 5) 최종 거절
+    throw new BadRequestException('Only audio/video files are allowed');
   }
 
   /**
@@ -67,10 +84,18 @@ export class MediaService {
    */
   async createPresign(
     originalFilename: string,
-    contentType: string,
+    contentType: string | undefined,
     ownerId: string,
+    kind?: Kind,
   ) {
-    this.ensureAllowed(contentType, originalFilename);
+    // 0) 서버 추론
+    const resolvedContentType =
+      contentType ?? guessContentType(originalFilename);
+    const resolvedKind =
+      kind ?? inferKindByExtOrMime(originalFilename, resolvedContentType);
+
+    // 1) 화이트리스트 체크
+    this.ensureAllowed(resolvedContentType, originalFilename);
 
     const id = uuidv4();
     const safeName = originalFilename.replace(/[^\w.\-()+\[\]{}@]/g, '_');
@@ -84,7 +109,7 @@ export class MediaService {
       await queryRunner.manager.insert(Media, {
         id,
         originalFilename,
-        contentType,
+        contentType: resolvedContentType,
         srcKey: key,
         status: 'UPLOADING',
         size: null,
@@ -93,7 +118,7 @@ export class MediaService {
       });
       await queryRunner.manager.insert(MediaCore, {
         mediaId: id,
-        ownerId, // BIGINT → string으로 다룸
+        ownerId,
         status: 'processing',
         title: originalFilename,
         description: null,
@@ -110,7 +135,7 @@ export class MediaService {
     }
 
     try {
-      const presign = await this.s3.presignedPut(key, contentType);
+      const presign = await this.s3.presignedPut(key, resolvedContentType);
       return { mediaId: id, ...presign };
     } catch (error) {
       this.logger?.warn?.(
