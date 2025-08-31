@@ -284,11 +284,9 @@ export class MediaService {
       createdAt: m.createdAt.toISOString(),
     }));
 
-    const endCursor = pageRows.length
-      ? encodeCursor({
-          createdAt: pageRows[pageRows.length - 1].createdAt.toISOString(),
-          id: pageRows[pageRows.length - 1].id,
-        })
+    const last = pageRows.at(-1);
+    const endCursor = last
+      ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id })
       : null;
 
     return {

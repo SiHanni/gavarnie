@@ -15,6 +15,7 @@ import {
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { MediaReactionModule } from './media-reaction/media-reaction.module';
+import { CommentsModule } from './comments/comments.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { MediaReactionModule } from './media-reaction/media-reaction.module';
     UsersModule,
     AuthModule,
     MediaReactionModule,
+    CommentsModule,
   ],
 })
 export class AppModule {}
