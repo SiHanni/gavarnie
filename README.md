@@ -1,4 +1,4 @@
-<img src="./images/gavarnie.png" alt="메인 로고" width="300"/>
+<img src="./images/banner_normal.png" alt="메인 로고" width="300"/>
 
 영상 소셜 네트워크 프로젝트 "Gavarnie"
 
