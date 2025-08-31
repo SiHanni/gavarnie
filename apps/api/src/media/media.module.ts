@@ -14,7 +14,7 @@ import { PublicMediaController } from './public/public-media.controller';
     S3Module,
     QueueModule,
   ],
-  providers: [MediaService, S3Service, PublicMediaController],
+  providers: [MediaService, S3Service],
   controllers: [UploadsController, PublicMediaController],
   exports: [MediaService],
 })

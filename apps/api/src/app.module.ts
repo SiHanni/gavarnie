@@ -4,9 +4,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HealthModule } from './health/health.module';
 import { MediaModule } from './media/media.module';
-import { Media, MediaCore } from '@gavarnie/entities';
+import {
+  Comment,
+  CommentReaction,
+  Media,
+  MediaCore,
+  MediaReaction,
+  User,
+} from '@gavarnie/entities';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { MediaReactionModule } from './media-reaction/media-reaction.module';
 
 @Module({
   imports: [
@@ -22,18 +30,25 @@ import { AuthModule } from './auth/auth.module';
         username: process.env.MYSQL_USER,
         password: process.env.MYSQL_PASSWORD,
         database: process.env.MYSQL_DB,
-        entities: [Media, MediaCore],
+        entities: [
+          Media,
+          MediaCore,
+          MediaReaction,
+          Comment,
+          CommentReaction,
+          User,
+        ],
         autoLoadEntities: false,
         synchronize: false,
         logging: true,
       }),
     }),
-    TypeOrmModule.forFeature([Media, MediaCore]),
     MongooseModule.forRoot(process.env.MONGO_URI || ''),
     HealthModule,
     MediaModule,
     UsersModule,
     AuthModule,
+    MediaReactionModule,
   ],
 })
 export class AppModule {}
