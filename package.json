@@ -16,5 +16,8 @@
     "dev:entities:watch": "yarn workspace @gavarnie/entities build:watch",
     "dev:all": "yarn workspace @gavarnie/entities build && concurrently -n ENTITIES,API,WORKER -c auto \"yarn workspace @gavarnie/entities build:watch\" \"yarn workspace @gavarnie/api start:dev\" \"yarn workspace @gavarnie/worker start:dev\""
   },
-  "packageManager": "yarn@4.9.3"
+  "packageManager": "yarn@4.9.3",
+  "devDependencies": {
+    "@types/mime-types": "^3.0.1"
+  }
 }

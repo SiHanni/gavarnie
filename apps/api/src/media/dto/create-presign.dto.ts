@@ -14,8 +14,9 @@ export class CreatePresignDto {
   originalFilename!: string;
 
   @ApiProperty({ example: 'audio/mpeg' })
+  @IsOptional()
   @IsMimeType()
-  contentType!: string;
+  contentType?: string;
 
   @ApiPropertyOptional({ enum: ['video', 'audio'] })
   @IsOptional()
