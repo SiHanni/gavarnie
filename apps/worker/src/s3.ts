@@ -24,12 +24,14 @@ export const s3 = new S3Client({
 export async function downloadToFile(key: string, toPath: string) {
   const obj = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
   console.log(`download file: ${obj}`);
+  console.log(`[s3] download ${key} -> ${toPath}`);
   await pipe(obj.Body as any, createWriteStream(toPath));
 }
 
 function guessContentType(file: string) {
   const ext = extname(file).toLowerCase();
   if (ext === '.m3u8') return 'application/vnd.apple.mpegurl';
+  if (ext === '.m4s') return 'video/iso.segment';
   if (ext === '.ts') return 'video/mp2t';
   if (ext === '.mp4') return 'video/mp4';
   if (ext === '.aac') return 'audio/aac';
@@ -61,4 +63,5 @@ export async function uploadDir(prefixKey: string, dir: string) {
       partSize: 8 * 1024 * 1024,
     }).done();
   }
+  console.log(`[s3] uploaded ${files.length} objects to ${prefixKey}/`);
 }

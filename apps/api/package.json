@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "start:dev": "nest start --watch",
-    "build": "nest build"
+    "build": "nest build",
+    "upload:test": "tsx scripts/upload-test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
@@ -27,6 +28,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "ioredis": "^5.7.0",
+    "mime-types": "^3.0.1",
     "mongoose": "^8.18.0",
     "mysql2": "^3.14.3",
     "passport": "^0.7.0",
@@ -63,6 +65,7 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.20.5",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
