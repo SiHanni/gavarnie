@@ -11,8 +11,15 @@ import {
   Comment,
 } from '@gavarnie/entities';
 
-type JobData = { mediaId: string; srcKey: string };
+type JobData = { mediaId: string; srcKey: string; contentType?: string };
 const QUEUE_NAME = 'transcode';
+
+function isAudio(ct?: string) {
+  return !!ct && ct.startsWith('audio/');
+}
+function isVideo(ct?: string) {
+  return !!ct && ct.startsWith('video/');
+}
 
 async function createDataSource() {
   const ds = new DataSource({
@@ -49,7 +56,7 @@ async function main() {
   const worker = new Worker<JobData>(
     QUEUE_NAME,
     async (job) => {
-      const { mediaId, srcKey } = job.data;
+      const { mediaId, srcKey, contentType } = job.data;
 
       // (a) 레코드 조회/검증
       const media = await mediaRepo.findOne({ where: { id: mediaId } });
@@ -58,30 +65,49 @@ async function main() {
 
       // 멱등: 이미 완료면 스킵
       if (media.status === 'READY' && media.hlsKey) {
-        return { skipped: true, hlsKey: media.hlsKey };
+        console.log(
+          `[worker] skip READY mediaId=${mediaId} hlsKey=${media.hlsKey}`,
+        );
+        return {
+          ok: true,
+          skipped: true,
+          status: 'READY',
+          hlsKey: media.hlsKey,
+        };
       }
 
       // (b) PROCESSING 전이
       media.status = 'PROCESSING' as any;
       media.error = null as any;
       await mediaRepo.save(media);
+      console.log(
+        `[worker] PROCESSING mediaId=${mediaId} ct=${contentType ?? media.contentType}`,
+      );
 
       try {
         // (c) FFmpeg → HLS → MinIO 업로드
-        const hlsKey = await transcodeToHLS(mediaId, srcKey);
+        const hlsKey = await transcodeToHLS(
+          mediaId,
+          srcKey,
+          contentType ?? media.contentType,
+        );
 
         // (d) READY 전이 + hlsKey 기록
         media.status = 'READY' as any;
         media.hlsKey = hlsKey;
         await mediaRepo.save(media);
 
-        return { hlsKey };
+        console.log(`[worker] READY mediaId=${mediaId} hlsKey=${hlsKey}`);
+        return { ok: true, status: 'READY', hlsKey };
       } catch (e: any) {
-        // (e) 실패 기록
+        const msg = e?.message || String(e);
         media.status = 'FAILED' as any;
-        media.error = e?.message || String(e);
+        media.error = msg;
         await mediaRepo.save(media);
-        throw e;
+
+        console.error(`[worker] FAILED mediaId=${mediaId} error=${msg}`);
+
+        throw new Error(msg);
       }
     },
     {

@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject } from '@nestjs/common';
+import { ForbiddenException, Inject, NotFoundException } from '@nestjs/common';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -188,8 +188,7 @@ export class MediaService {
 
   async getStatus(id: string) {
     const media = await this.mediaRepository.findOne({ where: { id } });
-    if (!media) return { exists: false };
-
+    if (!media) throw new NotFoundException('media not found');
     if (media.status !== 'READY') {
       throw new BadRequestException(`Media not ready (status=${media.status})`);
     }
