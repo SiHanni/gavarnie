@@ -225,7 +225,7 @@ export class MediaService {
       srcKey: media.srcKey,
       hlsKey: media.hlsKey,
       size: media.size,
-      updatedAt: media.updatedAt,
+      createdAt: media.createdAt,
     };
   }
 
@@ -235,15 +235,15 @@ export class MediaService {
 
   /**
    * READY 상태인 컨텐츠 목록 반환
-   * 커서 조건: (updatedAt, id) 튜플의 "엄격히 이전"만 가져오기
+   * 커서 조건: (createdAt, id) 튜플의 "엄격히 이전"만 가져오기
    *
    */
   async getRecent(dto: RecentQueryDto): Promise<RecentResponseDto> {
     const limit = dto.limit ?? 20;
     const cursor = decodeCursor(dto.cursor);
 
-    // ORDER BY updatedAt DESC, id DESC 를 쓰므로, where:
-    // (updatedAt < cursor.updatedAt) OR (updatedAt = cursor.updatedAt AND id < cursor.id)
+    // ORDER BY createdAt DESC, id DESC 를 쓰므로, where:
+    // (createdAt < cursor.createdAt) OR (createdAt = cursor.createdAt AND id < cursor.id)
     const qb = this.mediaRepository
       .createQueryBuilder('media')
       .select([
@@ -252,21 +252,21 @@ export class MediaService {
         'media.originalFilename',
         'media.contentType',
         'media.size',
-        'media.updatedAt',
+        'media.createdAt',
       ])
       .where('media.status = :ready', { ready: 'READY' })
       .andWhere('media.hlsKey IS NOT NULL')
-      .orderBy('media.updatedAt', 'DESC')
+      .orderBy('media.createdAt', 'DESC')
       .addOrderBy('media.id', 'DESC')
       .limit(limit + 1); // hasNextPage 판단용으로 하나 더 가져오기
 
     if (cursor) {
-      const cursorDate = new Date(cursor.updatedAt);
+      const cursorDate = new Date(cursor.createdAt);
       if (isNaN(cursorDate.getTime())) {
         throw new BadRequestException('Invalid cursor');
       }
       qb.andWhere(
-        '(media.updatedAt < :cud) OR (media.updatedAt = :cud AND media.id < :cid)',
+        '(media.createdAt < :cud) OR (media.createdAt = :cud AND media.id < :cid)',
         { cud: cursorDate, cid: cursor.id },
       );
     }
@@ -281,12 +281,12 @@ export class MediaService {
       originalFilename: m.originalFilename,
       contentType: m.contentType,
       size: m.size ?? null,
-      updatedAt: m.updatedAt.toISOString(),
+      createdAt: m.createdAt.toISOString(),
     }));
 
     const endCursor = pageRows.length
       ? encodeCursor({
-          updatedAt: pageRows[pageRows.length - 1].updatedAt.toISOString(),
+          createdAt: pageRows[pageRows.length - 1].createdAt.toISOString(),
           id: pageRows[pageRows.length - 1].id,
         })
       : null;

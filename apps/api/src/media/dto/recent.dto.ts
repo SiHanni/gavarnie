@@ -32,7 +32,7 @@ export class RecentMediaNode {
   @ApiProperty({ required: false, type: Number, nullable: true })
   size?: number | null;
   @ApiProperty()
-  updatedAt!: string; // ISO 문자열
+  createdAt!: string; // ISO 문자열
 }
 
 export class RecentPageInfo {

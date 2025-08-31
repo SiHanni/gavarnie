@@ -1,4 +1,4 @@
-export type CursorValue = { updatedAt: string; id: string };
+export type CursorValue = { createdAt: string; id: string };
 
 // base64(JSON)로 인코딩/디코딩
 export function encodeCursor(c: CursorValue): string {
@@ -8,8 +8,9 @@ export function decodeCursor(s?: string): CursorValue | null {
   if (!s) return null;
   try {
     const obj = JSON.parse(Buffer.from(s, 'base64').toString('utf8'));
-    if (typeof obj?.updatedAt === 'string' && typeof obj?.id === 'string')
+    if (typeof obj?.createdAt === 'string' && typeof obj?.id === 'string') {
       return obj;
+    }
     return null;
   } catch {
     return null;
