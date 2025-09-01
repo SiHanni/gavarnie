@@ -39,7 +39,7 @@ async function bootstrap() {
     process.env.SWAGGER !== 'false' && process.env.NODE_ENV !== 'production';
   if (enableSwagger) {
     const config = new DocumentBuilder()
-      .setTitle('Gavarnie API')
+      .setTitle('Catarie API')
       .setDescription('')
       .setVersion('0.1.0')
       .addBearerAuth(
@@ -62,7 +62,7 @@ async function bootstrap() {
 
     SwaggerModule.setup('docs', app, document, {
       swaggerOptions: { persistAuthorization: true },
-      customSiteTitle: 'Gavarnie Docs',
+      customSiteTitle: 'Catarie Docs',
       customCss: `
         .swagger-ui .topbar .link img { display: none !important; }
         .swagger-ui .topbar .link {

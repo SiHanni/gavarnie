@@ -6,3 +6,12 @@ html,
 body {
   height: 100%;
 }
+
+/* 스냅 컨테이너 전용: 스크롤바 숨기기 (Chrome/Safari/FF/Edge) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

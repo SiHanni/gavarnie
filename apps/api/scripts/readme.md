@@ -1,4 +1,4 @@
-## Upload test script for Gavarnie
+## Upload test script for Catarie
 
 - Flow:
 - 1.  POST /login → Bearer 토큰 획득
