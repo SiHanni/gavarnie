@@ -6,7 +6,7 @@ import { Queue } from 'bullmq';
 import { v4 as uuidv4 } from 'uuid';
 import { HeadObjectCommand } from '@aws-sdk/client-s3';
 import { S3Service } from '../storage/s3.service';
-import { Media } from '@gavarnie/entities';
+import { Comment, Media, MediaReaction, User } from '@gavarnie/entities';
 import { MediaCore } from '@gavarnie/entities';
 import { TRANSCODE_QUEUE } from '../queue/queue.module';
 import { MEDIA_EXTS } from './exts';
@@ -23,6 +23,11 @@ import {
   inferKindByExtOrMime,
 } from './utils/media-infer';
 
+type GetRecentArgs = {
+  limit: number;
+  cursor?: string;
+  currentUserId?: string;
+};
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
@@ -33,6 +38,11 @@ export class MediaService {
     private readonly mediaRepository: Repository<Media>,
     @InjectRepository(MediaCore)
     private readonly mediaCoreRepository: Repository<MediaCore>,
+    @InjectRepository(MediaReaction)
+    private readonly mediaReactionRepository: Repository<MediaReaction>,
+    @InjectRepository(Comment)
+    private readonly commentRepository: Repository<Comment>,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly s3: S3Service,
     @Inject(TRANSCODE_QUEUE) private readonly transcodeQueue: Queue,
   ) {}
@@ -246,14 +256,8 @@ export class MediaService {
     // (createdAt < cursor.createdAt) OR (createdAt = cursor.createdAt AND id < cursor.id)
     const qb = this.mediaRepository
       .createQueryBuilder('media')
-      .select([
-        'media.id',
-        'media.hlsKey',
-        'media.originalFilename',
-        'media.contentType',
-        'media.size',
-        'media.createdAt',
-      ])
+      .innerJoin('media.core', 'mediaCore')
+      .innerJoin('mediaCore.owner', 'owner')
       .where('media.status = :ready', { ready: 'READY' })
       .andWhere('media.hlsKey IS NOT NULL')
       .orderBy('media.createdAt', 'DESC')
@@ -271,27 +275,112 @@ export class MediaService {
       );
     }
 
-    const rows = await qb.getMany();
-    const hasNextPage = rows.length > limit;
-    const pageRows = hasNextPage ? rows.slice(0, limit) : rows;
+    // 필요한 컬럼만 선택 (민감정보 배제)
+    qb.select([
+      'media.id             AS m_id',
+      'media.hls_key        AS m_hls_key',
+      'media.original_filename AS m_original_filename',
+      'media.content_type   AS m_content_type',
+      'media.size           AS m_size',
+      'media.created_at     AS m_created_at',
+      'mediaCore.id            AS mc_id',
+      'owner.id             AS owner_id',
+      'owner.display_name   AS owner_display_name',
+      'owner.avatar_url     AS owner_avatar_url',
+    ]);
 
-    const nodes: RecentMediaNode[] = pageRows.map((m) => ({
-      id: m.id,
-      hlsKey: m.hlsKey!,
-      originalFilename: m.originalFilename,
-      contentType: m.contentType,
-      size: m.size ?? null,
-      createdAt: m.createdAt.toISOString(),
+    const raw = await qb.getRawMany<{
+      m_id: string;
+      m_hls_key: string | null;
+      m_original_filename: string;
+      m_content_type: string;
+      m_size: string | number | null;
+      m_created_at: Date;
+      mc_id: string; // BIGINT
+      owner_id: string;
+      owner_display_name: string;
+      owner_avatar_url: string | null;
+    }>();
+
+    const hasNextPage = raw.length > limit;
+    const pageRows = hasNextPage ? raw.slice(0, limit) : raw;
+
+    if (pageRows.length === 0) {
+      return { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } };
+    }
+
+    // 이번 페이지 묶음 id
+    const mediaCoreIds = pageRows.map((r) => String(r.mc_id)); // for 리액션, 댓글
+
+    // 좋아요 집계 (is_active=1만)
+    const likeRows = await this.mediaReactionRepository
+      .createQueryBuilder('mediaReaction')
+      .select('mediaReaction.media_core_id', 'mcid')
+      .addSelect(
+        'SUM(CASE WHEN mediaReaction.is_active = 1 THEN 1 ELSE 0 END)',
+        'likeCount',
+      )
+      .where('mediaReaction.media_core_id IN (:...ids)', { ids: mediaCoreIds })
+      .groupBy('mediaReaction.media_core_id')
+      .getRawMany<{ mcid: string; likeCount: string }>();
+
+    const likeCountMap = new Map<string, number>(
+      likeRows.map((r) => [String(r.mcid), Number(r.likeCount)]),
+    );
+
+    // 댓글 수 집계 (삭제되지 않은 것만)
+    const commentRows = await this.commentRepository
+      .createQueryBuilder('comment')
+      .select('comment.media_id', 'mcid')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('comment.media_id IN (:...ids)', { ids: mediaCoreIds })
+      .andWhere('comment.deleted_at IS NULL')
+      .groupBy('comment.media_id')
+      .getRawMany<{ mcid: string; cnt: string }>();
+    const commentCountMap = new Map(
+      commentRows.map((r) => [String(r.mcid), Number(r.cnt)]),
+    );
+
+    // 내가 좋아요 눌렀는지 (선택)
+    let likedByMeMap = new Map<string, boolean>();
+    if (dto.currentUserId) {
+      const liked = await this.mediaReactionRepository
+        .createQueryBuilder('reaction')
+        .select('reaction.media_core_id', 'mcid')
+        .where('reaction.user_id = :uid AND reaction.is_active = 1', {
+          uid: dto.currentUserId,
+        })
+        .andWhere('reaction.media_core_id IN (:...ids)', { ids: mediaCoreIds })
+        .getRawMany<{ mcid: string }>();
+      likedByMeMap = new Map(liked.map((r) => [String(r.mcid), true]));
+    }
+
+    // 응답 매핑
+    const nodes: RecentMediaNode[] = pageRows.map((r) => ({
+      id: r.m_id,
+      hlsKey: r.m_hls_key ?? '',
+      originalFilename: r.m_original_filename,
+      contentType: r.m_content_type,
+      size: r.m_size === null ? null : Number(r.m_size),
+      createdAt: new Date(r.m_created_at).toISOString(),
+      author: {
+        id: String(r.owner_id),
+        displayName: r.owner_display_name,
+        avatarUrl: r.owner_avatar_url ?? null,
+      },
+      likeCount: likeCountMap.get(String(r.mc_id)) ?? 0,
+      commentCount: commentCountMap.get(String(r.mc_id)) ?? 0,
+      ...(dto.currentUserId
+        ? { likedByMe: !!likedByMeMap.get(String(r.mc_id)) }
+        : {}),
     }));
 
-    const last = pageRows.at(-1);
-    const endCursor = last
-      ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id })
-      : null;
+    const last = pageRows.at(-1)!;
+    const endCursor = encodeCursor({
+      createdAt: new Date(last.m_created_at).toISOString(),
+      id: last.m_id,
+    });
 
-    return {
-      nodes,
-      pageInfo: { endCursor, hasNextPage },
-    };
+    return { nodes, pageInfo: { hasNextPage, endCursor } };
   }
 }

@@ -1,6 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Media, MediaCore } from '@gavarnie/entities';
+import {
+  Comment,
+  Media,
+  MediaCore,
+  MediaReaction,
+  User,
+} from '@gavarnie/entities';
 import { MediaService } from './media.service';
 import { UploadsController } from './uploads/uploads.controller';
 import { S3Module } from '../storage/s3.module';
@@ -10,7 +16,7 @@ import { PublicMediaController } from './public/public-media.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Media, MediaCore]),
+    TypeOrmModule.forFeature([Media, MediaCore, User, MediaReaction, Comment]),
     S3Module,
     QueueModule,
   ],
