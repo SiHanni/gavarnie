@@ -10,12 +10,12 @@ import {
 import { Type } from 'class-transformer';
 
 export class ListCommentsQueryDto {
-  @ApiProperty({ description: 'Media UUID (media.id)' })
+  @ApiProperty({ description: 'Media UUID' })
   @IsUUID('4')
   mediaId!: string;
 
   @ApiPropertyOptional({
-    description: 'Parent comment id (omit for root list)',
+    description: '부모 댓글 id',
     example: '12345',
   })
   @IsOptional()
@@ -30,7 +30,7 @@ export class ListCommentsQueryDto {
   limit?: number = 20;
 
   @ApiPropertyOptional({
-    description: 'Cursor (Base64). Use the server-provided endCursor as-is.',
+    description: 'Cursor (Base64). 서버에서 제공하는 endCursor값 사용',
   })
   @IsOptional()
   @IsString()

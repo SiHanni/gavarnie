@@ -7,8 +7,6 @@ import {
   UseGuards,
   Req,
   ParseUUIDPipe,
-  ForbiddenException,
-  Body,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
