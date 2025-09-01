@@ -26,6 +26,7 @@ export function storeToken(t: string) {
   if (typeof window !== 'undefined') localStorage.setItem(KEY, t);
   setAccessToken(t);
 }
+
 export function clearToken() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(KEY);
