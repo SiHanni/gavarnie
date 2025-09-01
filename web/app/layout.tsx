@@ -1,9 +1,8 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import Providers from '@/components/Providers';
 
-export const metadata: Metadata = {
-  title: 'Catarie Web',
-};
+export const metadata: Metadata = { title: 'Catarie' };
 
 export default function RootLayout({
   children,
@@ -12,9 +11,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang='ko'>
-      <body className='min-h-screen bg-white text-neutral-900'>
-        {/* TODO: TopNav / LeftSidebar는 다음 단계에서 추가 */}
-        <main className='max-w-[720px] mx-auto p-6'>{children}</main>
+      {/* ✅ 페이지 전체 검정 & 스크롤은 피드 컨테이너만 */}
+      <body className='min-h-[100svh] bg-black text-white overflow-hidden'>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
