@@ -4,10 +4,23 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Comment, Media, MediaCore } from '@gavarnie/entities';
+import { Repository, In } from 'typeorm';
+import { Comment, Media, MediaCore, User } from '@gavarnie/entities';
+import { CommentReaction } from '@gavarnie/entities';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import {
+  ListCommentsResponseDto,
+  CommentNodeDto,
+} from './dto/comment-node.dto';
 import { encodeCursor, decodeCursor } from '../media/utils/cursor.util';
+
+type ListArgs = {
+  mediaId: string;
+  parentId?: string;
+  limit: number;
+  cursor?: string;
+  currentUserId?: string;
+};
 
 @Injectable()
 export class CommentsService {
@@ -17,7 +30,10 @@ export class CommentsService {
     @InjectRepository(Media)
     private readonly mediaRepository: Repository<Media>,
     @InjectRepository(MediaCore)
-    private readonly coreRepo: Repository<MediaCore>,
+    private readonly coreRepository: Repository<MediaCore>,
+    @InjectRepository(CommentReaction)
+    private readonly commentReactionRepository: Repository<CommentReaction>,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
   ) {}
 
   private async mediaUuidToCoreId(mediaUuid: string): Promise<string> {
@@ -63,21 +79,18 @@ export class CommentsService {
   }
 
   /** 댓글 목록(루트) 또는 대댓글 목록(parentId 지정) – createdAt ASC, id ASC */
-  async list(q: {
-    mediaId: string;
-    parentId?: string;
-    limit: number;
-    cursor?: string;
-  }) {
+  async list(q: ListArgs): Promise<ListCommentsResponseDto> {
     const limit = Math.min(Math.max(q.limit ?? 20, 1), 50);
     const mediaCoreId = await this.mediaUuidToCoreId(q.mediaId);
 
     const cursor = decodeCursor(q.cursor);
+
     const qb = this.commentRepository
       .createQueryBuilder('c')
+      .leftJoin('c.user', 'u') // 작성자 조인
       .where('c.media_id = :mcid', { mcid: mediaCoreId })
       .andWhere('c.parent_id ' + (q.parentId ? '= :pid' : 'IS NULL'), {
-        pid: q.parentId,
+        pid: q.parentId ?? null,
       })
       .orderBy('c.created_at', 'ASC')
       .addOrderBy('c.id', 'ASC')
@@ -93,24 +106,96 @@ export class CommentsService {
       );
     }
 
-    const rows = await qb.getMany();
-    const hasNextPage = rows.length > limit;
-    const pageRows = hasNextPage ? rows.slice(0, limit) : rows;
+    // 필요한 컬럼만 raw로 선택하여 매핑 (민감정보 배제)
+    qb.select([
+      'c.id           AS c_id',
+      'c.parent_id    AS c_parent_id',
+      'c.depth        AS c_depth',
+      'c.text         AS c_text',
+      'c.created_at   AS c_created_at',
+      'c.deleted_at   AS c_deleted_at',
+      'u.id           AS u_id',
+      'u.display_name AS u_display_name',
+      'u.avatar_url   AS u_avatar_url',
+    ]);
 
-    const nodes = pageRows.map((r) => ({
-      id: r.id,
-      parentId: r.parentId ?? null,
-      depth: r.depth,
-      text: r.deletedAt ? '' : r.text,
-      isDeleted: !!r.deletedAt,
-      createdAt: r.createdAt.toISOString(),
+    const raw = await qb.getRawMany<{
+      c_id: string;
+      c_parent_id: string | null;
+      c_depth: number;
+      c_text: string;
+      c_created_at: Date;
+      c_deleted_at: Date | null;
+      u_id: string;
+      u_display_name: string;
+      u_avatar_url: string | null;
+    }>();
+
+    const hasNextPage = raw.length > limit;
+    const pageRows = hasNextPage ? raw.slice(0, limit) : raw;
+    //const rows = await qb.getMany();
+    //const hasNextPage = rows.length > limit;
+    //const pageRows = hasNextPage ? rows.slice(0, limit) : rows;
+
+    // 1) 이번 페이지 댓글 id 묶음
+    const commentIds = pageRows.map((r) => String(r.c_id));
+    if (commentIds.length === 0) {
+      return { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } };
+    }
+
+    // 2) 좋아요 집계 (is_active=1)
+    const counts = await this.commentReactionRepository
+      .createQueryBuilder('r')
+      .select('r.comment_id', 'commentId')
+      .addSelect(
+        'SUM(CASE WHEN r.is_active = 1 THEN 1 ELSE 0 END)',
+        'likeCount',
+      )
+      .where('r.comment_id IN (:...ids)', { ids: commentIds })
+      .groupBy('r.comment_id')
+      .getRawMany<{ commentId: string; likeCount: string }>();
+
+    const likeCountMap = new Map<string, number>(
+      counts.map((c) => [String(c.commentId), Number(c.likeCount)]),
+    );
+
+    // 3) 내가 좋아요 눌렀는지 (선택)
+    let likedByMeMap = new Map<string, boolean>();
+    if (q.currentUserId) {
+      const liked = await this.commentReactionRepository
+        .createQueryBuilder('r')
+        .select('r.comment_id', 'commentId')
+        .where('r.user_id = :uid AND r.is_active = 1', { uid: q.currentUserId })
+        .andWhere('r.comment_id IN (:...ids)', { ids: commentIds })
+        .getRawMany<{ commentId: string }>();
+
+      likedByMeMap = new Map(liked.map((r) => [String(r.commentId), true]));
+    }
+
+    // 4) 응답 매핑
+    const nodes: CommentNodeDto[] = pageRows.map((r) => ({
+      id: String(r.c_id),
+      parentId: r.c_parent_id ?? null,
+      depth: Number(r.c_depth),
+      text: r.c_deleted_at ? '' : r.c_text,
+      isDeleted: !!r.c_deleted_at,
+      createdAt: new Date(r.c_created_at).toISOString(),
+      author: {
+        id: String(r.u_id),
+        displayName: r.u_display_name,
+        avatarUrl: r.u_avatar_url ?? null,
+      },
+      likeCount: likeCountMap.get(String(r.c_id)) ?? 0,
+      ...(q.currentUserId
+        ? { likedByMe: !!likedByMeMap.get(String(r.c_id)) }
+        : {}),
     }));
 
     const last = pageRows.at(-1);
     const endCursor = last
       ? encodeCursor({
-          createdAt: last.createdAt.toISOString(),
-          id: String(last.id),
+          createdAt: new Date(last.c_created_at).toISOString(),
+          id: String(last.c_id),
         })
       : null;
 
