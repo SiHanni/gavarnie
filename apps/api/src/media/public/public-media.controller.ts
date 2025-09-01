@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   Query,
+  Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { MediaService } from '../media.service';
@@ -20,8 +21,15 @@ export class PublicMediaController {
     summary: 'READY 상태 미디어 목록 (최근 기준, 커서 기반 페이지네이션)',
   })
   @ApiOkResponse({ type: RecentResponseDto })
-  async getRecent(@Query() query: RecentQueryDto): Promise<RecentResponseDto> {
-    return this.mediaService.getRecent(query);
+  async getRecent(
+    @Req() req: any,
+    @Query() query: RecentQueryDto,
+  ): Promise<RecentResponseDto> {
+    return this.mediaService.getRecent({
+      limit: query.limit ?? 20,
+      cursor: query.cursor,
+      currentUserId: req.user?.userId,
+    });
   }
 
   @Get(':id')
