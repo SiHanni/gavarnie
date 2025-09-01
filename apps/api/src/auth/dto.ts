@@ -25,3 +25,14 @@ export class LoginDto {
   @MaxLength(64)
   password!: string;
 }
+
+export class MyProfileDto {
+  @ApiProperty()
+  id!: string;
+  @ApiProperty()
+  email!: string;
+  @ApiProperty()
+  displayName!: string;
+  @ApiProperty({ nullable: true })
+  avatarUrl!: string | null;
+}
