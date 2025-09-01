@@ -4,7 +4,7 @@ import { ENV } from '@/lib/env';
 // 공통 Axios 인스턴스
 export const api = axios.create({
   baseURL: ENV.API,
-  withCredentials: false, // 헤더 토큰 방식 가정
+  withCredentials: false, // 현재는 헤더 토큰 방식 가정
 });
 
 // (선택) AccessToken 보관. 로그인 붙일 때 사용 예정.
