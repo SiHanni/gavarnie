@@ -6,7 +6,8 @@
     "apps/*",
     "web",
     "infra",
-    "libs/*"
+    "libs/*",
+    "web"
   ],
   "scripts": {
     "build": "tsc -b -v",
