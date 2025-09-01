@@ -1,4 +1,4 @@
-<img src="./images/catarie_icon_black.png" alt="메인 로고" width="300"/>
+<img src="./images/catarie_icon_white.png" alt="메인 로고" width="300"/>
 
 #### 영상,음원 소셜 네트워크 프로젝트 "Catarie"
 
