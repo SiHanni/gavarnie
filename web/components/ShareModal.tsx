@@ -33,10 +33,13 @@ export default function ShareModal() {
     <div
       role='dialog'
       aria-modal='true'
-      className='fixed inset-0 z-[70] grid place-items-center'
+      className='fixed inset-0 z-[9999] grid place-items-center'
     >
-      <div className='absolute inset-0 bg-black/70' onClick={close} />
-      <div className='relative w-[min(560px,92vw)] rounded-2xl bg-neutral-950 text-white border border-white/10 p-6'>
+      <div className='fixed inset-0 z-[9998] bg-black/70' onClick={close} />
+      <div
+        className='relative z-[9999] w-[min(560px,92vw)] rounded-2xl bg-neutral-950 text-white border border-white/10 p-6'
+        onClick={e => e.stopPropagation()}
+      >
         <button
           onClick={close}
           className='absolute right-3 top-2 text-2xl text-white/70 hover:text-white'
@@ -62,7 +65,6 @@ export default function ShareModal() {
           </button>
         </div>
 
-        {/* 나중에 SNS 버튼들(카톡/트위터 등) 섹션 확장 가능 */}
         <div className='mt-4 text-xs text-white/50'>
           URL 복사 후 원하는 곳에 붙여넣기 하세요.
         </div>

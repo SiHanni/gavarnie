@@ -55,7 +55,7 @@ export default function RightActionBar({
   avatarUrl,
   avatarButtonSize = 56,
   avatarIconSize = 32,
-  avatarOffsetY = -20, // ← 기본 0, 음수면 위로 살짝 올림
+  avatarOffsetY = -20,
   buttonBgAlpha = 0.15,
   onLike,
   onComment,
@@ -89,12 +89,11 @@ export default function RightActionBar({
     children: React.ReactNode;
   }) => (
     <button
+      type='button'
       aria-label={label}
       onClick={e => {
-        if (onClick) {
-          stop(e);
-          onClick();
-        }
+        stop(e);
+        onClick?.();
       }}
       className='rounded-full grid place-items-center'
       style={{
@@ -119,11 +118,11 @@ export default function RightActionBar({
       }}
       aria-label='동작 메뉴'
     >
-      {/* ── 아바타 (위로 살짝 올리고 싶으면 avatarOffsetY에 음수 값) ── */}
+      {/* ── 아바타 ── */}
       <Circle
         size={avatarButtonSize}
         label='작성자 프로필'
-        style={{ transform: `translateY(${avatarOffsetY}px)` }} // ← 여기서만 따로 이동
+        style={{ transform: `translateY(${avatarOffsetY}px)` }}
       >
         <Avatar src={avatarUrl ?? undefined} size={avatarIconSize} />
       </Circle>

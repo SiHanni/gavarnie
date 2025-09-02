@@ -39,10 +39,8 @@ export default function AuthModal() {
           ? await login(email, password)
           : await signUp(email, password, displayName);
 
-      // 1) 토큰 저장 (기존과 동일)
       storeToken(r.accessToken);
 
-      // 2) 프로필 조회 -> 로컬 저장 -> 전역 알림
       const me = await fetchProfile();
       saveUserProfile(me);
       window.dispatchEvent(new CustomEvent('auth:login', { detail: me }));
@@ -59,12 +57,13 @@ export default function AuthModal() {
     <div
       role='dialog'
       aria-modal='true'
-      className='fixed inset-0 z-50 grid place-items-center'
+      className='fixed inset-0 z-[9999] grid place-items-center'
     >
-      <div className='absolute inset-0 bg-black/70' onClick={close} />
+      <div className='fixed inset-0 z-[9998] bg-black/70' onClick={close} />
       <form
         onSubmit={submit}
-        className='relative w-[min(540px,92vw)] max-h-[90vh] overflow-y-auto rounded-2xl bg-neutral-950 text-white border border-white/10 p-6'
+        className='relative z-[9999] w-[min(540px,92vw)] max-h-[90vh] overflow-y-auto rounded-2xl bg-neutral-950 text-white border border-white/10 p-6'
+        onClick={e => e.stopPropagation()}
       >
         <button
           type='button'
