@@ -63,7 +63,6 @@ export default function CommentsPanel() {
   if (!mounted) return null;
 
   return (
-    // ✅ 댓글 패널을 아주 높은 z-index로 고정해서 어떤 요소보다 항상 위
     <div
       className={`fixed inset-0 z-[1000] ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
     >
@@ -110,7 +109,7 @@ export default function CommentsPanel() {
           )}
         </div>
 
-        {/* 하단 작성 */}
+        {/* 하단 작성 — 언더라인을 absolute로 딱 붙게 */}
         <div className='p-3 border-t border-white/10'>
           <div className='flex items-start gap-3'>
             <Avatar
@@ -126,9 +125,10 @@ export default function CommentsPanel() {
                   value={text}
                   onChange={e => setText(e.target.value)}
                   placeholder='댓글 추가...'
-                  className='w-full resize-none bg-transparent outline-none px-0 py-1 text-[15px]'
+                  className='w-full resize-none bg-transparent outline-none px-0 py-1 text-[15px] leading-5'
                 />
-                <div className='h-px bg-white/20' />
+                {/* ⬇️ 밑줄을 텍스트 영역 바로 아래에 고정 */}
+                <div className='absolute left-0 right-0 bottom-[25px] h-px bg-white/30' />
               </div>
               <div className='mt-2 flex justify-end gap-2'>
                 <button

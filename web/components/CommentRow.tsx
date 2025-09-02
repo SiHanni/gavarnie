@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import Avatar from '@/components/Avatar';
 import { useAuthModal } from '@/contexts/AuthModalContext';
 import {
@@ -35,17 +36,17 @@ export default function CommentRow({
   const { open: openAuth } = useAuthModal();
   const me = typeof window !== 'undefined' ? loadUserProfile() : null;
 
-  // 좋아요(카운트는 서버 값 그대로)
+  // 상위 댓글 좋아요
   const { liked, displayCount, toggle, toggling } = useCommentLike(
     comment.id,
     comment.likeCount
   );
 
-  // 삭제(내가 쓴 댓글만 노출)
+  // 삭제(내가 쓴 댓글만)
   const iAmAuthor = me?.id && me.id === comment.author.id;
   const { mutate: del, isPending: deleting } = useDeleteComment();
 
-  // 대댓글 영역
+  // 대댓글 목록/페이징
   const [repliesOpen, setRepliesOpen] = useState(false);
   const {
     nodes: replies,
@@ -84,7 +85,7 @@ export default function CommentRow({
     );
   };
 
-  // 서버가 준 replyCount 활용(0 또는 null/undefined면 링크 숨김)
+  // 서버가 준 replyCount 우선 사용
   const serverReplyCount =
     typeof comment.replyCount === 'number'
       ? comment.replyCount
@@ -117,7 +118,7 @@ export default function CommentRow({
         {/* 액션 라인 */}
         <div className='mt-2 flex items-center gap-5 text-sm text-white/60'>
           <button
-            className={`hover:text-white ${liked ? 'text-white' : ''}`}
+            className={`hover:text-white inline-flex items-center gap-1 ${liked ? 'text-white' : ''}`}
             onClick={() => {
               if (!hasStoredToken()) {
                 openAuth('login');
@@ -127,7 +128,13 @@ export default function CommentRow({
             }}
             disabled={toggling}
           >
-            좋아요{' '}
+            <Image
+              src={liked ? '/images/like.png' : '/images/empty_heart.png'}
+              alt='heart'
+              width={16}
+              height={16}
+            />
+            <span>좋아요</span>
             {displayCount > 0 && (
               <span className='text-white/50'>{displayCount}</span>
             )}
@@ -163,7 +170,7 @@ export default function CommentRow({
           )}
         </div>
 
-        {/* ▼ “답글 N개 보기”는 액션 라인 '아래'에 단독으로 표기 */}
+        {/* ▼ “답글 N개 보기” */}
         {!repliesOpen && hasReplies && (
           <div className='mt-2'>
             <button
@@ -185,26 +192,7 @@ export default function CommentRow({
                 <div className='text-white/50 text-sm'>불러오는 중…</div>
               )}
               {replies.map(r => (
-                <div key={r.id} className='flex items-start gap-2'>
-                  <Avatar src={r.author.avatarUrl} size={28} />
-                  <div className='flex-1 min-w-0'>
-                    <div className='flex items-center gap-2'>
-                      <div className='text-sm font-semibold'>
-                        {r.author.displayName}
-                      </div>
-                      <div className='text-xs text-white/40'>
-                        {timeAgo(r.createdAt)}
-                      </div>
-                    </div>
-                    <div className='mt-1 text-[14px] leading-5'>
-                      {r.isDeleted ? (
-                        <span className='text-white/40'>(삭제됨)</span>
-                      ) : (
-                        r.text
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <ReplyRow key={r.id} reply={r} />
               ))}
               <div ref={bottomRef} className='h-4' />
               {isFetchingNextPage && (
@@ -212,7 +200,7 @@ export default function CommentRow({
               )}
             </div>
 
-            {/* 대댓글 작성 */}
+            {/* 대댓글 작성 — 언더라인을 텍스트 바로 아래로 */}
             <div className='flex items-start gap-2'>
               <Avatar
                 src={
@@ -229,9 +217,9 @@ export default function CommentRow({
                     value={reply}
                     onChange={e => setReply(e.target.value)}
                     placeholder='답글 추가...'
-                    className='w-full resize-none bg-transparent outline-none px-0 py-1 text-[14px]'
+                    className='w-full resize-none bg-transparent outline-none px-0 py-0 text-[14px] leading-[1.35]'
                   />
-                  <div className='h-px bg-white/20' />
+                  <div className='absolute left-0 right-0 bottom-[2px] h-px bg-white/35' />
                 </div>
                 <div className='mt-2 flex items-center gap-3'>
                   <button
@@ -259,6 +247,84 @@ export default function CommentRow({
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** ▼ 대댓글 한 줄 — 훅을 여기서 호출 (map 내부 호출 금지) */
+function ReplyRow({ reply }: { reply: CommentNode }) {
+  const { open: openAuth } = useAuthModal();
+  const me = typeof window !== 'undefined' ? loadUserProfile() : null;
+  const iAmReplyAuthor = me?.id && me.id === reply.author.id;
+
+  const {
+    liked: rLiked,
+    displayCount: rCount,
+    toggle: rToggle,
+    toggling: rToggling,
+  } = useCommentLike(reply.id, reply.likeCount);
+
+  const { mutate: delReply, isPending: delReplying } = useDeleteComment();
+
+  return (
+    <div className='flex items-start gap-2'>
+      <Avatar src={reply.author.avatarUrl} size={28} />
+      <div className='flex-1 min-w-0'>
+        <div className='flex items-center gap-2'>
+          <div className='text-sm font-semibold'>
+            {reply.author.displayName}
+          </div>
+          <div className='text-xs text-white/40'>
+            {timeAgo(reply.createdAt)}
+          </div>
+        </div>
+        <div className='mt-1 text-[14px] leading-5'>
+          {reply.isDeleted ? (
+            <span className='text-white/40'>(삭제됨)</span>
+          ) : (
+            reply.text
+          )}
+        </div>
+
+        <div className='mt-1 flex items-center gap-4 text-xs text-white/60'>
+          <button
+            className={`hover:text-white inline-flex items-center gap-1 ${rLiked ? 'text-white' : ''}`}
+            onClick={() => {
+              if (!hasStoredToken()) {
+                openAuth('login');
+                return;
+              }
+              rToggle();
+            }}
+            disabled={rToggling}
+          >
+            <Image
+              src={rLiked ? '/images/like.png' : '/images/empty_heart.png'}
+              alt='heart'
+              width={14}
+              height={14}
+            />
+            <span>좋아요</span>
+            {rCount > 0 && <span className='text-white/50'>{rCount}</span>}
+          </button>
+
+          {iAmReplyAuthor && (
+            <button
+              className='hover:text-white'
+              onClick={() => {
+                if (!hasStoredToken()) {
+                  openAuth('login');
+                  return;
+                }
+                delReply({ commentId: reply.id });
+              }}
+              disabled={delReplying}
+            >
+              삭제
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
