@@ -43,3 +43,22 @@ export function getStoredUser(): UserProfile | null {
 export function clearStoredUser() {
   if (typeof window !== 'undefined') localStorage.removeItem(KEY);
 }
+
+export function saveUserProfile(p: UserProfile) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(KEY, JSON.stringify(p));
+}
+
+export function loadUserProfile(): UserProfile | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const s = localStorage.getItem(KEY);
+    return s ? (JSON.parse(s) as UserProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearUserProfile() {
+  if (typeof window !== 'undefined') localStorage.removeItem(KEY);
+}
