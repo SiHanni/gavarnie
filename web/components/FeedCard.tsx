@@ -12,7 +12,6 @@ export default function FeedCard({ node }: { node: RecentMediaNode }) {
     <article className='mb-8 rounded-2xl overflow-hidden border border-neutral-200 bg-white'>
       {/* 상단: 작성자/파일명 */}
       <header className='p-4 flex items-center gap-3'>
-        {/* TODO:  "작성자 아바타 PNG/SVG"  (32x32) */}
         <div className='size-8 rounded-full bg-neutral-200' />
         <div className='flex-1 min-w-0'>
           <div className='text-sm font-semibold truncate'>
@@ -22,7 +21,6 @@ export default function FeedCard({ node }: { node: RecentMediaNode }) {
             {node.originalFilename}
           </div>
         </div>
-        {/* TODO: 여기 "더보기(점3개) 아이콘" */}
       </header>
 
       {/* 본문: HLS 비디오 */}
@@ -33,8 +31,8 @@ export default function FeedCard({ node }: { node: RecentMediaNode }) {
       {/* 하단: 액션/카운트 (초기 뼈대: 클릭만) */}
       <footer className='p-4 flex items-center justify-between'>
         <div className='flex items-center gap-4'>
-          {/* TODO: "좋아요 아이콘" (40x40) */}
           <button
+            type='button'
             className='text-sm'
             onClick={() => {
               /* TODO: /media/:id like */
@@ -43,8 +41,8 @@ export default function FeedCard({ node }: { node: RecentMediaNode }) {
             좋아요 {node.likeCount}
           </button>
 
-          {/* TODO:  "댓글 아이콘"  (40x40) */}
           <button
+            type='button'
             className='text-sm'
             onClick={() => {
               /* TODO: 댓글 패널 오픈 */
@@ -53,8 +51,8 @@ export default function FeedCard({ node }: { node: RecentMediaNode }) {
             댓글 {node.commentCount}
           </button>
 
-          {/* TODO:  "공유 아이콘"  (40x40) */}
           <button
+            type='button'
             className='text-sm'
             onClick={() => {
               /* TODO: 공유(프론트) */

@@ -49,7 +49,6 @@ export default function UploadModal() {
     setMsg('');
     setProgress(0);
     return () => {
-      // 닫힐 때 정리
       xhrRef.current?.abort();
       if (pollTimer.current) clearTimeout(pollTimer.current);
       pollTimer.current = null;
@@ -100,12 +99,12 @@ export default function UploadModal() {
       setMsg('서버에 업로드 완료 알림…');
       await completeUpload(mediaId, key, file.size);
 
-      // 4) 초기 대기(큐 픽업 여유) → 5초 후 폴링 시작
+      // 4) 초기 대기
       setStep('waiting');
       setMsg('처리 대기 중… (곧 시작됩니다)');
       await delay(WARMUP_MS);
 
-      // 5) 상태 폴링 (3초 간격, 최대 2분)
+      // 5) 상태 폴링
       setStep('polling');
       setMsg('미디어 처리 중…');
       await pollStatus(mediaId, INTERVAL_MS, TIMEOUT_MS);
@@ -113,7 +112,6 @@ export default function UploadModal() {
       setMsg('처리 완료! 피드에서 확인할 수 있어요.');
       close();
     } catch (e: any) {
-      // READY/FAILED 외의 에러 처리
       if (e?.__status === 'FAILED') {
         setStep('failed');
         setMsg('처리 실패. 파일을 다시 시도해 주세요.');
@@ -135,11 +133,17 @@ export default function UploadModal() {
     <div
       role='dialog'
       aria-modal='true'
-      className='fixed inset-0 z-[60] grid place-items-center'
+      // ⬇️ 모달 최상단 레이어(전역 최고 우선순위)
+      className='fixed inset-0 z-[9999] grid place-items-center'
     >
-      <div className='absolute inset-0 bg-black/70' onClick={cancelAll} />
+      {/* 백드롭 (모달 아래지만 페이지 최상단) */}
+      <div className='fixed inset-0 z-[9998] bg-black/70' onClick={cancelAll} />
 
-      <div className='relative w-[min(640px,92vw)] max-h-[92vh] overflow-y-auto rounded-2xl bg-neutral-950 text-white border border-white/10 p-6'>
+      {/* 모달 콘텐츠 */}
+      <div
+        className='relative z-[9999] w-[min(640px,92vw)] max-h-[92vh] overflow-y-auto rounded-2xl bg-neutral-950 text-white border border-white/10 p-6'
+        onClick={e => e.stopPropagation()}
+      >
         <button
           type='button'
           onClick={cancelAll}
@@ -222,7 +226,6 @@ export default function UploadModal() {
           <div className='text-sm text-white/70 ml-auto'>{msg}</div>
         </div>
 
-        {/* 안내 */}
         {(step === 'waiting' || step === 'polling') && (
           <p className='mt-3 text-xs text-white/50'>
             업로드 완료 후 작업 큐에서 트랜스코딩을 시작하기까지 시간이 조금
