@@ -106,7 +106,7 @@ export default function FeedSnapItem({
   };
   const stop = (e: React.MouseEvent) => e.stopPropagation();
 
-  // ====== 🔧 크기 노브 (여기 숫자만 바꾸면 전체 조정됩니다) ======
+  // ====== 크기 노브 ======
   const RAIL_BTN = Math.min(76, Math.max(56, Math.round(height * 0.085))); // 세로레일 버튼 지름
   const RAIL_ICON = Math.round(RAIL_BTN * 0.52); // 아이콘 크기
   const OVERLAY_BTN = Math.round(RAIL_BTN * 0.86); // 좌상단 버튼 지름

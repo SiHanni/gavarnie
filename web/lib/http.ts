@@ -33,7 +33,7 @@ export function clearToken() {
   setAccessToken(null);
 }
 
-// ✅ 모듈이 로드되는 순간에 동기 복구 (가장 중요)
+// 모듈이 로드되는 순간에 동기 복구 (가장 중요)
 if (typeof window !== 'undefined') {
   const t = localStorage.getItem(KEY);
   if (t) setAccessToken(t);
