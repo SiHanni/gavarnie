@@ -15,6 +15,8 @@ import { AuthModalProvider } from '@/contexts/AuthModalContext';
 import { UploadModalProvider } from '@/contexts/UploadModalContext';
 import AuthModal from '@/components/AuthModal';
 import UploadModal from '@/components/UploadModal';
+import { ShareModalProvider } from '@/contexts/ShareModalContext';
+import ShareModal from '@/components/ShareModal';
 
 export const metadata: Metadata = {
   title: 'Catarie',
@@ -38,20 +40,24 @@ export default function RootLayout({
         <Providers>
           <AuthModalProvider>
             <UploadModalProvider>
-              {/* 좌측 상단 배너 아이콘 (크기/위치 숫자로 쉽게 조절) */}
-              <TopLeftBrand
-                left={20} // px
-                top={-20} // px
-                size={160} // px (정사각)
-              />
-              {/* 우측 상단: 업로드/로그인/아바타 */}
-              <TopRightActions />
-              {/* 로그인/회원가입 모달 */}
-              <AuthModal />
-              {/* 업로드 모달 */}
-              <UploadModal />
-              {/* 실제 페이지 */}
-              {children}
+              <ShareModalProvider>
+                {/* 좌측 상단 배너 아이콘 (크기/위치 숫자로 쉽게 조절) */}
+                <TopLeftBrand
+                  left={20} // px
+                  top={-20} // px
+                  size={160} // px (정사각)
+                />
+                {/* 우측 상단: 업로드/로그인/아바타 */}
+                <TopRightActions />
+                {/* 로그인/회원가입 모달 */}
+                <AuthModal />
+                {/* 업로드 모달 */}
+                <UploadModal />
+                {/* 공유 모달 */}
+                <ShareModal />
+                {/* 실제 페이지 */}
+                {children}
+              </ShareModalProvider>
             </UploadModalProvider>
           </AuthModalProvider>
         </Providers>

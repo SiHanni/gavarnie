@@ -13,6 +13,7 @@ import Avatar from '@/components/Avatar';
 // import { ENV } from '@/lib/env'; // (미사용이라 주석 처리)
 import { useMediaLike } from '@/hooks/useMediaLike';
 import { shareLink } from '@/lib/share';
+import { useShareModal } from '@/contexts/ShareModalContext';
 
 function isAudio(node: RecentMediaNode) {
   return node.contentType?.startsWith('audio/');
@@ -28,6 +29,8 @@ export default function FeedSnapItem({
   const streamUrl = useMemo(() => joinHls(node.hlsKey), [node.hlsKey]);
   const audioKind = isAudio(node);
   const title = filenameWithoutExt(node.originalFilename);
+
+  const { open: openShare } = useShareModal();
 
   // 👍 좋아요 연동 (낙관적 업데이트 + 서버 카운트)
   const { liked, count, toggle } = useMediaLike(node.id);
@@ -255,7 +258,7 @@ export default function FeedSnapItem({
                 typeof window !== 'undefined'
                   ? `${location.origin}/?m=${node.id}`
                   : streamUrl;
-              shareLink(url, title);
+              openShare({ url, title });
             }}
           />
         </div>
