@@ -6967,7 +6967,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hls.js@npm:^1.5.0":
+"hls.js@npm:^1.6.11":
   version: 1.6.11
   resolution: "hls.js@npm:1.6.11"
   checksum: 10c0/bf98d5796750ddc33bf301133256950fe894332e5cde9733433b98e6738fe72a86746fb2f3cc901f6f8a67afa2fca55f4606adfdb5c631dca3780a9d7353ea00
@@ -11261,7 +11261,7 @@ __metadata:
     autoprefixer: "npm:^10.4.19"
     axios: "npm:^1.7.0"
     clsx: "npm:^2.1.0"
-    hls.js: "npm:^1.5.0"
+    hls.js: "npm:^1.6.11"
     next: "npm:14.2.5"
     postcss: "npm:^8.4.38"
     react: "npm:18.3.1"

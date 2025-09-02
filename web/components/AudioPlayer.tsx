@@ -1,38 +1,64 @@
 'use client';
 
 import { forwardRef, useEffect, useRef } from 'react';
-import { attachHlsTo } from '@/lib/hls';
+import Hls from 'hls.js';
 
-type Props = { src: string };
+type Props = React.AudioHTMLAttributes<HTMLAudioElement> & {
+  src: string;
+};
 
 const AudioPlayer = forwardRef<HTMLAudioElement, Props>(function AudioPlayer(
-  { src },
-  refFromParent
+  { src, ...rest },
+  ref
 ) {
-  const elRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // 외부 ref 연결
+  useEffect(() => {
+    if (!ref) return;
+    if (typeof ref === 'function') ref(audioRef.current);
+    else
+      (ref as React.MutableRefObject<HTMLAudioElement | null>).current =
+        audioRef.current;
+  }, [ref]);
 
   useEffect(() => {
-    if (!refFromParent) return;
-    if (typeof refFromParent === 'function') refFromParent(elRef.current);
-    else (refFromParent as any).current = elRef.current;
-  }, [refFromParent]);
+    const el = audioRef.current;
+    if (!el) return;
+    let hls: Hls | null = null;
 
-  useEffect(() => {
-    const a = elRef.current;
-    if (!a) return;
-    attachHlsTo(a, src);
+    // Safari(네이티브 HLS)면 그냥 src 설정
+    const canNativeHls = el.canPlayType('application/vnd.apple.mpegURL') !== '';
+    if (canNativeHls) {
+      el.src = src;
+      el.load();
+      return () => {
+        el.removeAttribute('src');
+        el.load();
+      };
+    }
+
+    // Chrome/Edge 등 → hls.js
+    if (Hls.isSupported()) {
+      hls = new Hls({ lowLatencyMode: true });
+      hls.loadSource(src);
+      hls.attachMedia(el);
+    } else {
+      // 아주 구형 브라우저 대응 불가
+      el.src = src; // 시도만
+      el.load();
+    }
+
+    return () => {
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+      el.removeAttribute('src');
+      el.load();
+    };
   }, [src]);
 
-  return (
-    <audio
-      ref={elRef}
-      className='hidden'
-      crossOrigin='anonymous'
-      controls={false}
-      playsInline
-      preload='auto'
-    />
-  );
+  return <audio ref={audioRef} {...rest} playsInline />;
 });
 
 export default AudioPlayer;
