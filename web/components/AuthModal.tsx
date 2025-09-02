@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useAuthModal } from '@/contexts/AuthModalContext';
 import { ENV } from '@/lib/env';
-import { login, signUp, storeToken } from '@/lib/http';
-import { setUserFromToken } from '@/lib/user';
+import { login, signUp, storeToken, fetchProfile } from '@/lib/http';
+import { setUserFromToken, saveUserProfile } from '@/lib/user';
 
 export default function AuthModal() {
   const { isOpen, close, mode, setMode } = useAuthModal();
@@ -34,21 +34,19 @@ export default function AuthModal() {
     setLoading(true);
     setErr(null);
     try {
-      if (mode === 'login') {
-        const r = await login(email, password);
-        storeToken(r.accessToken);
-        const profile = setUserFromToken(r.accessToken);
-        window.dispatchEvent(
-          new CustomEvent('auth:login', { detail: profile })
-        );
-      } else {
-        const r = await signUp(email, password, displayName);
-        storeToken(r.accessToken);
-        const profile = setUserFromToken(r.accessToken);
-        window.dispatchEvent(
-          new CustomEvent('auth:login', { detail: profile })
-        );
-      }
+      const r =
+        mode === 'login'
+          ? await login(email, password)
+          : await signUp(email, password, displayName);
+
+      // 1) 토큰 저장 (기존과 동일)
+      storeToken(r.accessToken);
+
+      // 2) 프로필 조회 -> 로컬 저장 -> 전역 알림
+      const me = await fetchProfile();
+      saveUserProfile(me);
+      window.dispatchEvent(new CustomEvent('auth:login', { detail: me }));
+
       close();
     } catch (e: any) {
       setErr(e?.message || '요청 실패');

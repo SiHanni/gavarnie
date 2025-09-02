@@ -36,3 +36,6 @@ web/.env.*
 
 # Coverage
 coverage/
+
+# next
+web/.next/

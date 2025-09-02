@@ -9,27 +9,34 @@ export const http = axios.create({
 });
 
 // 토큰 보관/복구
+const KEY = 'accessToken';
 let accessToken: string | null = null;
+
 export const setAccessToken = (t: string | null) => {
   accessToken = t;
 };
 export const getAccessToken = () => accessToken;
 
-const KEY = 'accessToken';
 export function initAuthFromStorage() {
   if (typeof window === 'undefined') return;
   const t = localStorage.getItem(KEY);
   if (t) setAccessToken(t);
 }
 export function storeToken(t: string) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(KEY, t);
+  if (typeof window !== 'undefined') localStorage.setItem(KEY, t);
   setAccessToken(t);
 }
+
 export function clearToken() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(KEY);
   setAccessToken(null);
+}
+
+// ✅ 모듈이 로드되는 순간에 동기 복구 (가장 중요)
+if (typeof window !== 'undefined') {
+  const t = localStorage.getItem(KEY);
+  if (t) setAccessToken(t);
 }
 
 // 요청: 토큰 주입
@@ -126,4 +133,22 @@ export async function getMediaStatus(id: string) {
     url: `/uploads/media/${id}/status`,
     method: 'GET',
   });
+}
+
+// 1) 토큰 존재 여부(초기 렌더에서 깜빡임 방지용)
+export function hasStoredToken(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!localStorage.getItem(KEY);
+}
+
+// 2) 프로필 조회 API (/auth/profile)
+export type ProfileResponse = {
+  id: string;
+  email: string;
+  displayName: string;
+  avatarUrl: string | null;
+};
+
+export async function fetchProfile(): Promise<ProfileResponse> {
+  return request<ProfileResponse>({ url: '/auth/profile', method: 'GET' });
 }

@@ -231,11 +231,11 @@ export default function FeedSnapItem({
             avatarButtonSize={65}
             avatarIconSize={60}
             // ✅ 개별 버튼 지름
-            likeButtonSize={55}
-            commentButtonSize={55}
-            shareButtonSize={55}
+            likeButtonSize={50}
+            commentButtonSize={50}
+            shareButtonSize={50}
             // ✅ 개별 아이콘 크기 (원과 독립)
-            likeIconSize={35}
+            likeIconSize={33}
             commentIconSize={40}
             shareIconSize={40}
             buttonBgAlpha={0.18}
