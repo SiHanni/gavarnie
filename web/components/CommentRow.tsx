@@ -34,16 +34,14 @@ export default function CommentRow({
 }) {
   const { open: openAuth } = useAuthModal();
 
-  const { liked, likeCount, toggle, toggling } = useCommentLike(
+  const { liked, displayCount, toggle, toggling } = useCommentLike(
     comment.id,
     comment.likeCount
   );
   const { mutate: del, isPending: deleting } = useDeleteComment();
 
-  // 대댓글 토글
   const [repliesOpen, setRepliesOpen] = useState(false);
 
-  // 대댓글 목록
   const {
     nodes: replies,
     fetchNextPage,
@@ -65,7 +63,6 @@ export default function CommentRow({
     return () => io.disconnect();
   }, [hasNextPage, fetchNextPage]);
 
-  // 대댓글 작성 — Enter는 줄바꿈만, 버튼으로 등록
   const [reply, setReply] = useState('');
   const { mutate: createReply, isPending: creatingReply } = useCreateComment();
   const submitReply = () => {
@@ -85,7 +82,6 @@ export default function CommentRow({
     <div className='flex items-start gap-3'>
       <Avatar src={comment.author.avatarUrl} size={36} />
       <div className='flex-1 min-w-0'>
-        {/* 이름/시간 */}
         <div className='flex items-center gap-2'>
           <div className='text-sm font-semibold'>
             {comment.author.displayName}
@@ -95,7 +91,6 @@ export default function CommentRow({
           </div>
         </div>
 
-        {/* 본문 */}
         <div className='mt-1 text-[15px] leading-5'>
           {comment.isDeleted ? (
             <span className='text-white/40'>(삭제된 댓글)</span>
@@ -104,10 +99,9 @@ export default function CommentRow({
           )}
         </div>
 
-        {/* 액션 라인 */}
         <div className='mt-2 flex items-center gap-5 text-sm text-white/60'>
           <button
-            className='hover:text-white'
+            className={`hover:text-white ${liked ? 'text-white' : ''}`}
             onClick={() => {
               if (!hasStoredToken()) {
                 openAuth('login');
@@ -118,8 +112,8 @@ export default function CommentRow({
             disabled={toggling}
           >
             좋아요{' '}
-            {likeCount > 0 && (
-              <span className='text-white/50'>{likeCount}</span>
+            {displayCount > 0 && (
+              <span className='text-white/50'>{displayCount}</span>
             )}
           </button>
 
@@ -160,10 +154,8 @@ export default function CommentRow({
           </button>
         </div>
 
-        {/* 대댓글 섹션 */}
         {repliesOpen && (
           <div className='mt-3 pl-3 border-l border-white/10 space-y-3'>
-            {/* 대댓글 목록 */}
             <div className='space-y-3'>
               {repliesLoading && (
                 <div className='text-white/50 text-sm'>불러오는 중…</div>
@@ -196,7 +188,6 @@ export default function CommentRow({
               )}
             </div>
 
-            {/* 대댓글 작성 UI — 두 번째 스샷 느낌 */}
             <div className='flex items-start gap-2'>
               <Avatar
                 src={

@@ -30,6 +30,7 @@ export function CommentsPanelProvider({
     setMediaId(args.mediaId);
     setOpen(true);
   }, []);
+
   const close = useCallback(() => {
     setOpen(false);
     setMediaId(null);
@@ -39,6 +40,7 @@ export function CommentsPanelProvider({
     () => ({ isOpen, mediaId, open, close }),
     [isOpen, mediaId, open, close]
   );
+
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
