@@ -55,7 +55,7 @@ export default function RightActionBar({
   avatarUrl,
   avatarButtonSize = 56,
   avatarIconSize = 32,
-  avatarOffsetY = -10, // ← 기본 0, 음수면 위로 살짝 올림
+  avatarOffsetY = -20, // ← 기본 0, 음수면 위로 살짝 올림
   buttonBgAlpha = 0.15,
   onLike,
   onComment,
