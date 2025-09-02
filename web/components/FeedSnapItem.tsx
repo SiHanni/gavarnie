@@ -284,14 +284,17 @@ export default function FeedSnapItem({
           </div>
 
           {/* ===== 우측 액션 레일 (모달보다 아래, 콘텐츠보다 위) ===== */}
-          <div className='relative z-[100] pointer-events-auto'>
+          <div
+            className='relative z-[100] pointer-events-auto'
+            style={{ height }}
+          >
             <RightActionBar
               avatarUrl={node.author.avatarUrl || undefined}
               likeCount={count}
               commentCount={node.commentCount}
               stageHeight={height}
               offsetY={160}
-              avatarButtonSize={65}
+              avatarButtonSize={60}
               avatarIconSize={60}
               likeButtonSize={50}
               commentButtonSize={50}

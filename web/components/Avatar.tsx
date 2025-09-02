@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-
 export default function Avatar({
   src,
   size = 32,
@@ -11,31 +9,29 @@ export default function Avatar({
   size?: number;
   alt?: string;
 }) {
-  const [err, setErr] = useState(false);
+  const common = { width: size, height: size };
 
-  // URL이 없거나, 로드 에러면 회색 원으로 폴백
-  if (!src || err) {
+  if (src) {
+    // 원격 도메인 무관하게 표시되도록 next/image 대신 <img> 사용
     return (
-      <div
-        aria-label='avatar-fallback'
-        className='rounded-full bg-neutral-400'
-        style={{ width: size, height: size }}
+      <img
+        src={src}
+        alt={alt}
+        width={size}
+        height={size}
+        referrerPolicy='no-referrer'
+        className='rounded-full object-cover border border-white/20'
+        style={common}
       />
     );
   }
 
-  // 최단 경로: <img>를 사용하면 next.config.js 설정 없이 외부 URL 바로 표시 가능
+  // 기본 placeholder
   return (
-    <img
-      src={src}
-      alt={alt}
-      width={size}
-      height={size}
-      onError={() => setErr(true)}
-      className='rounded-full object-cover'
-      style={{ width: size, height: size }}
-      loading='lazy'
-      referrerPolicy='no-referrer'
+    <div
+      className='rounded-full bg-white/10 border border-white/20'
+      style={common}
+      aria-label='no avatar'
     />
   );
 }

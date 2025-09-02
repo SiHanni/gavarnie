@@ -63,10 +63,11 @@ export default function CommentsPanel() {
   if (!mounted) return null;
 
   return (
+    // ✅ 댓글 패널을 아주 높은 z-index로 고정해서 어떤 요소보다 항상 위
     <div
-      className={`fixed inset-0 z-[70] ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+      className={`fixed inset-0 z-[1000] ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
     >
-      {/* 오버레이 (여기 클릭시만 닫힘) */}
+      {/* 오버레이 */}
       <div
         className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${
           isOpen
@@ -75,13 +76,11 @@ export default function CommentsPanel() {
         }`}
         onClick={close}
       />
-
-      {/* 패널 본체 */}
+      {/* 패널 */}
       <aside
         className={panelCls + ' pointer-events-auto'}
         aria-hidden={!isOpen}
       >
-        {/* 헤더 */}
         <div className='flex items-center justify-between p-4 border-b border-white/10'>
           <div className='text-base font-semibold'>댓글</div>
           <button
@@ -92,7 +91,6 @@ export default function CommentsPanel() {
           </button>
         </div>
 
-        {/* 목록 */}
         <div className='flex-1 overflow-y-auto px-3 py-3 space-y-4'>
           {isLoading && <div className='text-white/60 p-3'>불러오는 중…</div>}
           {isError && (
@@ -112,7 +110,7 @@ export default function CommentsPanel() {
           )}
         </div>
 
-        {/* 하단 작성 (Enter=줄바꿈, 버튼으로 등록) */}
+        {/* 하단 작성 */}
         <div className='p-3 border-t border-white/10'>
           <div className='flex items-start gap-3'>
             <Avatar
