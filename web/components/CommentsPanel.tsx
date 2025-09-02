@@ -7,6 +7,7 @@ import Avatar from '@/components/Avatar';
 import { hasStoredToken } from '@/lib/http';
 import { loadUserProfile } from '@/lib/user';
 import { useAuthModal } from '@/contexts/AuthModalContext';
+import CommentRow from './CommentRow';
 
 export default function CommentsPanel() {
   const { isOpen, mediaId, close } = useCommentsPanel();
@@ -20,9 +21,11 @@ export default function CommentsPanel() {
     isFetchingNextPage,
     isLoading,
     isError,
-  } = useInfiniteComments({ mediaId: mediaId || '', parentId: undefined });
+  } = useInfiniteComments({
+    mediaId: isOpen ? mediaId : null,
+    parentId: undefined,
+  });
 
-  // 무한 스크롤
   const bottomRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!bottomRef.current || !hasNextPage) return;
@@ -36,7 +39,6 @@ export default function CommentsPanel() {
     return () => io.disconnect();
   }, [hasNextPage, fetchNextPage]);
 
-  // 작성(루트)
   const [text, setText] = useState('');
   const { mutate: create, isPending: creating } = useCreateComment();
   const { open: openAuth } = useAuthModal();
@@ -51,7 +53,6 @@ export default function CommentsPanel() {
     create({ mediaId: mediaId!, text: v }, { onSuccess: () => setText('') });
   };
 
-  // 슬라이드 애니메이션
   const panelCls = `
     absolute right-0 top-0 h-full w-[min(470px,96vw)]
     bg-neutral-950 text-white border-l border-white/10
@@ -62,15 +63,24 @@ export default function CommentsPanel() {
   if (!mounted) return null;
 
   return (
-    <div className='fixed inset-0 z-[70]'>
-      {/* 반투명 배경 — 오직 여기 클릭시만 닫힘 */}
+    <div
+      className={`fixed inset-0 z-[70] ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+    >
+      {/* 오버레이 (여기 클릭시만 닫힘) */}
       <div
-        className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${
+          isOpen
+            ? 'opacity-100 pointer-events-auto'
+            : 'opacity-0 pointer-events-none'
+        }`}
         onClick={close}
       />
 
-      {/* 패널(오버레이 위) */}
-      <aside className={panelCls} aria-hidden={!isOpen}>
+      {/* 패널 본체 */}
+      <aside
+        className={panelCls + ' pointer-events-auto'}
+        aria-hidden={!isOpen}
+      >
         {/* 헤더 */}
         <div className='flex items-center justify-between p-4 border-b border-white/10'>
           <div className='text-base font-semibold'>댓글</div>
@@ -89,7 +99,6 @@ export default function CommentsPanel() {
             <div className='text-red-400 p-3'>댓글을 불러오지 못했어요.</div>
           )}
           {nodes.map(c => (
-            // CommentRow는 그대로 사용(아래에서 교체 코드 제공)
             <CommentRow key={c.id} mediaId={mediaId!} comment={c} />
           ))}
           <div ref={bottomRef} className='h-6' />
@@ -103,7 +112,7 @@ export default function CommentsPanel() {
           )}
         </div>
 
-        {/* 하단 작성 — Enter는 줄바꿈만, "댓글" 버튼으로 확정 */}
+        {/* 하단 작성 (Enter=줄바꿈, 버튼으로 등록) */}
         <div className='p-3 border-t border-white/10'>
           <div className='flex items-start gap-3'>
             <Avatar
@@ -145,6 +154,3 @@ export default function CommentsPanel() {
     </div>
   );
 }
-
-/* 내부에서 쓰는 행 컴포넌트 임포트 (분리 파일을 쓰고 있다면 위 import로 바꿔도 됨) */
-import CommentRow from './CommentRow';

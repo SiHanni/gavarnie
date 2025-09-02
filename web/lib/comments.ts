@@ -16,8 +16,7 @@ export type CommentNode = {
   createdAt: string;
   author: CommentAuthor;
   likeCount: number;
-  // 서버에 있으면 사용, 없으면 undefined → "답글 보기"로 표기
-  replyCount?: number;
+  replyCount?: number; // 서버에서 주면 표시
 };
 
 export type CommentsPage = {
@@ -29,9 +28,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   const token = getAccessToken();
 
-  if (!(init.body instanceof FormData)) {
+  if (!(init.body instanceof FormData))
     headers.set('Content-Type', 'application/json');
-  }
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   const res = await fetch(`${ENV.API}${path}`, {
@@ -59,7 +57,7 @@ export function listComments(params: {
   q.set('mediaId', params.mediaId);
   if (params.parentId) q.set('parentId', params.parentId);
   if (params.limit) q.set('limit', String(params.limit));
-  if (params.cursor) q.set('cursor', params.cursor);
+  if (params.cursor) q.set('cursor', params.cursor!);
   return request<CommentsPage>(`/comments?${q.toString()}`);
 }
 
