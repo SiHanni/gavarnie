@@ -58,7 +58,8 @@ const AudioPlayer = forwardRef<HTMLAudioElement, Props>(function AudioPlayer(
     };
   }, [src]);
 
-  return <audio ref={audioRef} {...rest} playsInline />;
+  //return <audio ref={audioRef} {...rest} playsInline />;      // 음원 재생 끝나고 반복재생 x
+  return <audio ref={audioRef} {...rest} playsInline loop />; // 반복 재생 o
 });
 
 export default AudioPlayer;
