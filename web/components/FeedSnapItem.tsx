@@ -10,6 +10,9 @@ import AudioPlayer from '@/components/AudioPlayer';
 import RightActionBar from '@/components/RightActionBar';
 import { useStageBox } from '@/hooks/useStageBox';
 import Avatar from '@/components/Avatar';
+// import { ENV } from '@/lib/env'; // (미사용이라 주석 처리)
+import { useMediaLike } from '@/hooks/useMediaLike';
+import { shareLink } from '@/lib/share';
 
 function isAudio(node: RecentMediaNode) {
   return node.contentType?.startsWith('audio/');
@@ -25,6 +28,9 @@ export default function FeedSnapItem({
   const streamUrl = useMemo(() => joinHls(node.hlsKey), [node.hlsKey]);
   const audioKind = isAudio(node);
   const title = filenameWithoutExt(node.originalFilename);
+
+  // 👍 좋아요 연동 (낙관적 업데이트 + 서버 카운트)
+  const { liked, count, toggle } = useMediaLike(node.id);
 
   // 프레임 크기 계산
   const { width, height } = useStageBox(80, 0.96, 9 / 16);
@@ -220,10 +226,10 @@ export default function FeedSnapItem({
             </div>
           </div>
 
-          {/* ======== 오른쪽 세로 레일 (크기 전달) ======== */}
+          {/* ======== 오른쪽 세로 레일 (좋아요/댓글/공유 연결) ======== */}
           <RightActionBar
             avatarUrl={node.author.avatarUrl || undefined}
-            likeCount={node.likeCount}
+            likeCount={count} // ✅ 서버 카운트 + 낙관적 반영
             commentCount={node.commentCount}
             stageHeight={height}
             offsetY={160} // 레일을 더 아래로
@@ -239,9 +245,18 @@ export default function FeedSnapItem({
             commentIconSize={40}
             shareIconSize={40}
             buttonBgAlpha={0.18}
-            onLike={() => {}}
-            onComment={() => {}}
-            onShare={() => {}}
+            onLike={toggle} // ✅ 좋아요 토글
+            onComment={() => {
+              // TODO: 댓글 패널 열기 (다음 단계에서 연결)
+              // 예: window.dispatchEvent(new CustomEvent('comments:open', { detail: { mediaId: node.id } }));
+            }}
+            onShare={() => {
+              const url =
+                typeof window !== 'undefined'
+                  ? `${location.origin}/?m=${node.id}`
+                  : streamUrl;
+              shareLink(url, title);
+            }}
           />
         </div>
       </div>

@@ -153,3 +153,25 @@ export type ProfileResponse = {
 export async function fetchProfile(): Promise<ProfileResponse> {
   return request<ProfileResponse>({ url: '/auth/profile', method: 'GET' });
 }
+
+// ========= Media Reactions =========
+export async function mediaLike(mediaUuid: string) {
+  return request<{ liked: boolean; alreadyExisted: boolean }>({
+    url: `/media/${mediaUuid}/like`,
+    method: 'POST',
+  });
+}
+
+export async function mediaUnlike(mediaUuid: string) {
+  return request<{ liked: boolean; alreadyExisted: boolean }>({
+    url: `/media/${mediaUuid}/like`,
+    method: 'DELETE',
+  });
+}
+
+export async function mediaLikeCount(mediaUuid: string) {
+  return request<{ count: number }>({
+    url: `/media/${mediaUuid}/likes/count`,
+    method: 'GET',
+  });
+}
