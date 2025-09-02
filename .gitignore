@@ -37,8 +37,5 @@ web/.env.*
 # Coverage
 coverage/
 
-<<<<<<< HEAD
-=======
 # next
->>>>>>> a5a22c8 (feat(user, auth): get My Profile API)
 web/.next/
