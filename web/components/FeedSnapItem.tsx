@@ -13,6 +13,7 @@ import Avatar from '@/components/Avatar';
 import { useMediaLike } from '@/hooks/useMediaLike';
 import { useShareModal } from '@/contexts/ShareModalContext';
 import ProgressBar from '@/components/ProgressBar';
+import { useCommentsPanel } from '@/contexts/CommentsPanelContext';
 
 function isAudio(node: RecentMediaNode) {
   return node.contentType?.startsWith('audio/');
@@ -31,6 +32,8 @@ export default function FeedSnapItem({
 
   const { open: openShare } = useShareModal();
   const { liked, count, toggle } = useMediaLike(node.id);
+
+  const { open: openComments } = useCommentsPanel();
 
   const { width, height } = useStageBox(80, 0.96, 9 / 16);
 
@@ -298,7 +301,7 @@ export default function FeedSnapItem({
               shareIconSize={40}
               buttonBgAlpha={0.18}
               onLike={toggle}
-              onComment={() => {}}
+              onComment={() => openComments({ mediaId: node.id })}
               onShare={() => {
                 const url =
                   typeof window !== 'undefined'
