@@ -1,38 +1,28 @@
 'use client';
 
 import Image from 'next/image';
-import Avatar from '@/components/Avatar';
+import clsx from 'clsx';
 
 type Props = {
-  likeCount: number;
-  commentCount: number;
-  stageHeight: number;
+  avatarUrl?: string;
+  likeCount?: number;
+  commentCount?: number;
+  stageHeight: number; // 세로 가운데 정렬용(부모 flex와 함께 사용)
+  offsetY?: number; // 필요한 경우만 사용(기본 120)
 
-  // 레일 전체를 아래로 내리고 싶을 때(+px)
-  offsetY?: number;
-
-  // 공통 기본 버튼 지름(px) – 개별 값 없을 때만 사용
-  buttonSize?: number;
-
-  // 개별 버튼 지름(px)
+  // 원형 버튼 지름
+  avatarButtonSize?: number;
   likeButtonSize?: number;
   commentButtonSize?: number;
   shareButtonSize?: number;
 
-  // 개별 아이콘 크기(px) — 버튼 지름과 독립
+  // 내부 아이콘 크기
+  avatarIconSize?: number;
   likeIconSize?: number;
   commentIconSize?: number;
   shareIconSize?: number;
 
-  // 아바타(맨 위) 설정
-  avatarUrl?: string;
-  avatarButtonSize?: number; // 원형 배경 지름
-  avatarIconSize?: number; // 내부 이미지 한 변
-
-  // ✅ 아바타만 위/아래로 미세 이동(px) — 음수면 위로
-  avatarOffsetY?: number;
-
-  // 회색 원형 배경 투명도(0~1). 0.15 ~ 0.22 권장
+  // 원 배경 투명도(0~1)
   buttonBgAlpha?: number;
 
   onLike?: () => void;
@@ -41,130 +31,161 @@ type Props = {
 };
 
 export default function RightActionBar({
-  likeCount,
-  commentCount,
-  stageHeight,
-  offsetY = 40,
-  buttonSize = 56,
-  likeButtonSize,
-  commentButtonSize,
-  shareButtonSize,
-  likeIconSize = 28,
-  commentIconSize = 28,
-  shareIconSize = 28,
   avatarUrl,
+  likeCount = 0,
+  commentCount = 0,
+  stageHeight,
+  offsetY = 120,
+
   avatarButtonSize = 56,
-  avatarIconSize = 32,
-  avatarOffsetY = -20,
-  buttonBgAlpha = 0.15,
+  likeButtonSize = 48,
+  commentButtonSize = 48,
+  shareButtonSize = 48,
+
+  avatarIconSize = 52,
+  likeIconSize = 30,
+  commentIconSize = 30,
+  shareIconSize = 30,
+
+  buttonBgAlpha = 0.18,
+
   onLike,
   onComment,
   onShare,
 }: Props) {
-  const stop = (e: React.MouseEvent) => e.stopPropagation();
+  // ✅ 댓글 패널보다 항상 아래로만 깔리게 낮은 z-index 고정
+  //    (패널은 z-[1000] 을 사용 중)
+  const wrapCls = clsx('relative z-30 flex flex-col items-center gap-4');
 
-  // 버튼 지름(아이콘과 독립)
-  const likeBtn = likeButtonSize ?? buttonSize ?? 56;
-  const cmtBtn = commentButtonSize ?? buttonSize ?? 56;
-  const shareBtn = shareButtonSize ?? buttonSize ?? 56;
-
-  // 레일 너비는 가장 큰 버튼 기준
-  const railWidth = Math.max(avatarButtonSize, likeBtn, cmtBtn, shareBtn) + 8;
-
-  const bg = `rgba(255,255,255,${buttonBgAlpha})`;
-
-  const Circle = ({
-    size,
-    children,
-    label,
-    onClick,
-    background = bg,
-    style,
-  }: {
-    size: number;
-    label?: string;
-    onClick?: () => void;
-    background?: string;
-    style?: React.CSSProperties;
-    children: React.ReactNode;
-  }) => (
-    <button
-      type='button'
-      aria-label={label}
-      onClick={e => {
-        stop(e);
-        onClick?.();
-      }}
-      className='rounded-full grid place-items-center'
-      style={{
-        width: size,
-        height: size,
-        backgroundColor: background,
-        ...style,
-      }}
-    >
-      {children}
-    </button>
-  );
+  const circle = (size: number) => ({
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    backgroundColor: `rgba(255,255,255,${buttonBgAlpha})`,
+  });
 
   return (
-    <aside
-      onClick={stop}
-      className='select-none flex flex-col items-center justify-center gap-3'
-      style={{
-        height: stageHeight,
-        width: railWidth,
-        transform: `translateY(${offsetY}px)`,
-      }}
-      aria-label='동작 메뉴'
+    <div
+      className={wrapCls + ' absolute top-1/2 left-0'}
+      style={{ transform: `translateY(calc(-50% + ${offsetY}px))` }}
     >
-      {/* ── 아바타 ── */}
-      <Circle
-        size={avatarButtonSize}
-        label='작성자 프로필'
-        style={{ transform: `translateY(${avatarOffsetY}px)` }}
-      >
-        <Avatar src={avatarUrl ?? undefined} size={avatarIconSize} />
-      </Circle>
+      {/* 작성자 */}
+      <RailItem
+        buttonSize={avatarButtonSize}
+        iconSize={avatarIconSize}
+        circle={circle}
+        icon={
+          avatarUrl ? (
+            // 아바타는 어떤 도메인도 허용되도록 <img> 사용
+            <img
+              src={avatarUrl}
+              alt='author'
+              width={avatarButtonSize}
+              height={avatarButtonSize}
+              className='w-full h-full object-cover rounded-full'
+              referrerPolicy='no-referrer'
+            />
+          ) : (
+            <div className='grid place-items-center w-full h-full text-white/80 text-sm'>
+              ?
+            </div>
+          )
+        }
+      />
 
       {/* 좋아요 */}
-      <div className='flex flex-col items-center gap-1'>
-        <Circle size={likeBtn} label='좋아요' onClick={onLike}>
+      <RailItem
+        buttonSize={likeButtonSize}
+        iconSize={likeIconSize}
+        circle={circle}
+        count={likeCount}
+        onClick={onLike}
+        icon={
           <Image
             src='/images/like.png'
-            alt=''
+            alt='like'
             width={likeIconSize}
             height={likeIconSize}
-            style={{ width: likeIconSize, height: likeIconSize }}
+            className='pointer-events-none'
           />
-        </Circle>
-        <span className='text-xs text-white/80'>{likeCount}</span>
-      </div>
+        }
+      />
 
       {/* 댓글 */}
-      <div className='flex flex-col items-center gap-1'>
-        <Circle size={cmtBtn} label='댓글' onClick={onComment}>
+      <RailItem
+        buttonSize={commentButtonSize}
+        iconSize={commentIconSize}
+        circle={circle}
+        count={commentCount}
+        onClick={onComment}
+        icon={
           <Image
             src='/images/comment_list.png'
-            alt=''
+            alt='comments'
             width={commentIconSize}
             height={commentIconSize}
-            style={{ width: commentIconSize, height: commentIconSize }}
+            className='pointer-events-none'
           />
-        </Circle>
-        <span className='text-xs text-white/80'>{commentCount}</span>
-      </div>
+        }
+      />
 
       {/* 공유 */}
-      <Circle size={shareBtn} label='공유' onClick={onShare}>
-        <Image
-          src='/images/shareV1.png'
-          alt=''
-          width={shareIconSize}
-          height={shareIconSize}
-          style={{ width: shareIconSize, height: shareIconSize }}
-        />
-      </Circle>
-    </aside>
+      <RailItem
+        buttonSize={shareButtonSize}
+        iconSize={shareIconSize}
+        circle={circle}
+        onClick={onShare}
+        icon={
+          <Image
+            src='/images/shareV1.png'
+            alt='share'
+            width={shareIconSize}
+            height={shareIconSize}
+            className='pointer-events-none'
+          />
+        }
+      />
+    </div>
   );
+}
+
+function RailItem({
+  buttonSize,
+  iconSize,
+  circle,
+  count,
+  onClick,
+  icon,
+}: {
+  buttonSize: number;
+  iconSize: number;
+  circle: (n: number) => React.CSSProperties;
+  count?: number;
+  onClick?: () => void;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className='flex flex-col items-center'>
+      {/* ✅ 아이콘은 원 안 '정중앙' */}
+      <button
+        type='button'
+        onClick={onClick}
+        className='grid place-items-center text-white'
+        style={circle(buttonSize)}
+      >
+        {icon}
+      </button>
+      {/* ✅ 카운트는 원 '바깥 아래' — 위로 밀리는 현상 제거 */}
+      {typeof count === 'number' && (
+        <span className='mt-1 text-xs text-white/80'>{formatCount(count)}</span>
+      )}
+    </div>
+  );
+}
+
+function formatCount(n: number) {
+  if (n >= 1_000_000) return `${Math.floor(n / 100_000) / 10}M`;
+  if (n >= 10_000) return `${Math.floor(n / 1_000) / 10}만`;
+  if (n >= 1_000) return `${Math.floor(n / 100) / 10}천`;
+  return String(n);
 }
