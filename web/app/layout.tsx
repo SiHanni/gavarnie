@@ -1,4 +1,3 @@
-// web/app/layout.tsx
 import './globals.css';
 import type { Metadata } from 'next';
 import Providers from '@/components/Providers';
@@ -21,7 +20,6 @@ import ShareModal from '@/components/ShareModal';
 export const metadata: Metadata = {
   title: 'Catarie',
   icons: {
-    // ✅ 파비콘: public 경로 기준
     icon: '/images/favicon.png',
     shortcut: '/images/favicon.png',
     apple: '/images/favicon.png',

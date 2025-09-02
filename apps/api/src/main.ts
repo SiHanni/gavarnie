@@ -28,6 +28,7 @@ async function bootstrap() {
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'http://localhost:3100', // local dev web port
+      'http://127.0.0.1:3100',
     ],
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

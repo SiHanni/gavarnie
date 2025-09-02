@@ -12,7 +12,7 @@ export default function FeedCard({ node }: { node: RecentMediaNode }) {
     <article className='mb-8 rounded-2xl overflow-hidden border border-neutral-200 bg-white'>
       {/* 상단: 작성자/파일명 */}
       <header className='p-4 flex items-center gap-3'>
-        {/* TODO: 여기 "작성자 아바타 PNG/SVG" 넣어주세요 (32x32) */}
+        {/* TODO:  "작성자 아바타 PNG/SVG"  (32x32) */}
         <div className='size-8 rounded-full bg-neutral-200' />
         <div className='flex-1 min-w-0'>
           <div className='text-sm font-semibold truncate'>
@@ -33,7 +33,7 @@ export default function FeedCard({ node }: { node: RecentMediaNode }) {
       {/* 하단: 액션/카운트 (초기 뼈대: 클릭만) */}
       <footer className='p-4 flex items-center justify-between'>
         <div className='flex items-center gap-4'>
-          {/* TODO: 여기 "좋아요 아이콘" 넣어주세요 (40x40) */}
+          {/* TODO: "좋아요 아이콘" (40x40) */}
           <button
             className='text-sm'
             onClick={() => {
@@ -43,7 +43,7 @@ export default function FeedCard({ node }: { node: RecentMediaNode }) {
             좋아요 {node.likeCount}
           </button>
 
-          {/* TODO: 여기 "댓글 아이콘" 넣어주세요 (40x40) */}
+          {/* TODO:  "댓글 아이콘"  (40x40) */}
           <button
             className='text-sm'
             onClick={() => {
@@ -53,7 +53,7 @@ export default function FeedCard({ node }: { node: RecentMediaNode }) {
             댓글 {node.commentCount}
           </button>
 
-          {/* TODO: 여기 "공유 아이콘" 넣어주세요 (40x40) */}
+          {/* TODO:  "공유 아이콘"  (40x40) */}
           <button
             className='text-sm'
             onClick={() => {
