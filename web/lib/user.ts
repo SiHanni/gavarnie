@@ -24,24 +24,10 @@ export function setUserFromToken(token: string): UserProfile | null {
     id: p.userId || p.sub,
     email: p.email,
     displayName: p.displayName || p.name || 'User',
-    avatarUrl: p.avatarUrl ?? null, // 토큰에 있으면 사용
+    avatarUrl: p.avatarUrl ?? null,
   };
   localStorage.setItem(KEY, JSON.stringify(profile));
   return profile;
-}
-
-export function getStoredUser(): UserProfile | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const s = localStorage.getItem(KEY);
-    return s ? (JSON.parse(s) as UserProfile) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function clearStoredUser() {
-  if (typeof window !== 'undefined') localStorage.removeItem(KEY);
 }
 
 export function saveUserProfile(p: UserProfile) {
