@@ -3,6 +3,7 @@ export async function shareLink(url: string, title = 'Catarie') {
   try {
     if (navigator.share) {
       await navigator.share({ title, url });
+      // TODO: 카카오톡, 라인, 메시지 앱 등 네이티브 공유 패널 추가
       return true;
     }
   } catch {
