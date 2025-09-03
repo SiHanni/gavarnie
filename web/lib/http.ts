@@ -17,11 +17,13 @@ export const setAccessToken = (t: string | null) => {
 };
 export const getAccessToken = () => accessToken;
 
+/** 새로 고침을 했을 때 localStorage에서 토큰을 가져오는 함수 */
 export function initAuthFromStorage() {
   if (typeof window === 'undefined') return;
   const t = localStorage.getItem(KEY);
   if (t) setAccessToken(t);
 }
+
 export function storeToken(t: string) {
   if (typeof window !== 'undefined') localStorage.setItem(KEY, t);
   setAccessToken(t);
@@ -103,6 +105,7 @@ export type Presign =
       mediaId: string;
     };
 
+/** 영상 원본 업로드를 위한 presing URL 발급 요청 API */
 export async function presignUpload(
   originalFilename: string,
   contentType?: string,
@@ -115,6 +118,10 @@ export async function presignUpload(
   });
 }
 
+/**
+ * 영상 원본 업로드 후 호출
+ * - size는 보내지 않아도 서버에서 처리하긴함
+ * */
 export async function completeUpload(
   mediaId: string,
   key: string,

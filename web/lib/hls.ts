@@ -1,4 +1,4 @@
-// HLS를 HTMLMediaElement(비디오/오디오 공용)에 붙여주는 헬퍼
+// HLS를 HTMLMediaElement(비디오)에 붙여주는 헬퍼
 export async function attachHlsTo(media: HTMLMediaElement, src: string) {
   // 사파리 등 네이티브 HLS 가능 브라우저
   if ((media as any).canPlayType?.('application/vnd.apple.mpegurl')) {
