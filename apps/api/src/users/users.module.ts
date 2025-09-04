@@ -1,10 +1,20 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from '@gavarnie/entities';
+import {
+  Comment,
+  Media,
+  MediaCore,
+  MediaReaction,
+  User,
+} from '@gavarnie/entities';
 import { UsersService } from './users.service';
+import { UsersController } from './users.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User])],
+  imports: [
+    TypeOrmModule.forFeature([Media, MediaCore, User, MediaReaction, Comment]),
+  ],
+  controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],
 })
