@@ -39,11 +39,17 @@ export default function CommentRow({
   // 상위 댓글 좋아요
   const { liked, displayCount, toggle, toggling } = useCommentLike(
     comment.id,
-    comment.likeCount
+    comment.likeCount ?? 0
   );
 
+  // FIX: author 접근 시 안전 가드
+  const authorId = comment.author?.id;
+  const authorName = comment.author?.displayName ?? '알 수 없음';
+  const authorAvatar = comment.author?.avatarUrl ?? null;
+
   // 삭제(내가 쓴 댓글만)
-  const iAmAuthor = me?.id && me.id === comment.author.id;
+  // FIX: optional chaining
+  const iAmAuthor = !!(me?.id && authorId && me.id === authorId);
   const { mutate: del, isPending: deleting } = useDeleteComment();
 
   // 대댓글 목록/페이징
@@ -92,15 +98,15 @@ export default function CommentRow({
       : (replies?.length ?? 0);
   const hasReplies = serverReplyCount > 0;
 
+  const isDeleted = !!comment.isDeleted;
+
   return (
     <div className='flex items-start gap-3'>
-      <Avatar src={comment.author.avatarUrl} size={36} />
+      <Avatar src={authorAvatar} size={36} />
       <div className='flex-1 min-w-0'>
         {/* 이름/시간 */}
         <div className='flex items-center gap-2'>
-          <div className='text-sm font-semibold'>
-            {comment.author.displayName}
-          </div>
+          <div className='text-sm font-semibold'>{authorName}</div>
           <div className='text-xs text-white/40'>
             {timeAgo(comment.createdAt)}
           </div>
@@ -108,7 +114,7 @@ export default function CommentRow({
 
         {/* 본문 */}
         <div className='mt-1 text-[15px] leading-5'>
-          {comment.isDeleted ? (
+          {isDeleted ? (
             <span className='text-white/40'>(삭제된 댓글)</span>
           ) : (
             comment.text
@@ -118,15 +124,20 @@ export default function CommentRow({
         {/* 액션 라인 */}
         <div className='mt-2 flex items-center gap-5 text-sm text-white/60'>
           <button
-            className={`hover:text-white inline-flex items-center gap-1 ${liked ? 'text-white' : ''}`}
+            className={`hover:text-white inline-flex items-center gap-1 ${!isDeleted && liked ? 'text-white' : ''}`}
             onClick={() => {
               if (!hasStoredToken()) {
                 openAuth('login');
                 return;
               }
+              if (isDeleted) return; // FIX: 삭제된 댓글 보호
               toggle();
             }}
-            disabled={toggling}
+            disabled={toggling || isDeleted}
+            aria-disabled={toggling || isDeleted}
+            title={
+              isDeleted ? '삭제된 댓글에는 좋아요를 사용할 수 없어요' : '좋아요'
+            }
           >
             <Image
               src={liked ? '/images/like.png' : '/images/empty_heart.png'}
@@ -140,18 +151,20 @@ export default function CommentRow({
             )}
           </button>
 
-          <button
-            className='hover:text-white'
-            onClick={() => {
-              if (!hasStoredToken()) {
-                openAuth('login');
-                return;
-              }
-              setRepliesOpen(true);
-            }}
-          >
-            답글
-          </button>
+          {!isDeleted && (
+            <button
+              className='hover:text-white'
+              onClick={() => {
+                if (!hasStoredToken()) {
+                  openAuth('login');
+                  return;
+                }
+                setRepliesOpen(true);
+              }}
+            >
+              답글
+            </button>
+          )}
 
           {iAmAuthor && (
             <button
@@ -161,7 +174,12 @@ export default function CommentRow({
                   openAuth('login');
                   return;
                 }
-                del({ commentId: comment.id });
+                // FIX: mediaId 반드시 전달
+                del({
+                  mediaId,
+                  commentId: comment.id,
+                  parentId: comment.parentId ?? null,
+                });
               }}
               disabled={deleting}
             >
@@ -171,7 +189,7 @@ export default function CommentRow({
         </div>
 
         {/* ▼ “답글 N개 보기” */}
-        {!repliesOpen && hasReplies && (
+        {!repliesOpen && hasReplies && !isDeleted && (
           <div className='mt-2'>
             <button
               className='flex items-center gap-2 text-[15px] text-[#3ea6ff] hover:underline'
@@ -192,7 +210,8 @@ export default function CommentRow({
                 <div className='text-white/50 text-sm'>불러오는 중…</div>
               )}
               {replies.map(r => (
-                <ReplyRow key={r.id} reply={r} />
+                // FIX: mediaId 전달
+                <ReplyRow key={r.id} reply={r} mediaId={mediaId} />
               ))}
               <div ref={bottomRef} className='h-4' />
               {isFetchingNextPage && (
@@ -200,51 +219,53 @@ export default function CommentRow({
               )}
             </div>
 
-            {/* 대댓글 작성 — 언더라인을 텍스트 바로 아래로 */}
-            <div className='flex items-start gap-2'>
-              <Avatar
-                src={
-                  hasStoredToken()
-                    ? (loadUserProfile()?.avatarUrl ?? null)
-                    : null
-                }
-                size={28}
-              />
-              <div className='flex-1'>
-                <div className='relative'>
-                  <textarea
-                    rows={2}
-                    value={reply}
-                    onChange={e => setReply(e.target.value)}
-                    placeholder='답글 추가...'
-                    className='w-full resize-none bg-transparent outline-none px-0 py-0 text-[14px] leading-[1.35]'
-                  />
-                  <div className='absolute left-0 right-0 bottom-[2px] h-px bg-white/35' />
-                </div>
-                <div className='mt-2 flex items-center gap-3'>
-                  <button
-                    className='text-[#3ea6ff] hover:underline'
-                    onClick={() => setRepliesOpen(false)}
-                  >
-                    답글 닫기
-                  </button>
-                  <div className='flex-1' />
-                  <button
-                    className='px-3 py-1.5 rounded-full text-xs bg-white/10 hover:bg-white/15'
-                    onClick={() => setReply('')}
-                  >
-                    취소
-                  </button>
-                  <button
-                    className='px-3 py-1.5 rounded-full text-xs bg-white text-black font-semibold disabled:opacity-50'
-                    onClick={submitReply}
-                    disabled={!reply.trim() || creatingReply}
-                  >
-                    답글
-                  </button>
+            {/* 대댓글 작성 */}
+            {!isDeleted && (
+              <div className='flex items-start gap-2'>
+                <Avatar
+                  src={
+                    hasStoredToken()
+                      ? (loadUserProfile()?.avatarUrl ?? null)
+                      : null
+                  }
+                  size={28}
+                />
+                <div className='flex-1'>
+                  <div className='relative'>
+                    <textarea
+                      rows={2}
+                      value={reply}
+                      onChange={e => setReply(e.target.value)}
+                      placeholder='답글 추가...'
+                      className='w-full resize-none bg-transparent outline-none px-0 py-0 text-[14px] leading-[1.35]'
+                    />
+                    <div className='absolute left-0 right-0 bottom-[2px] h-px bg-white/35' />
+                  </div>
+                  <div className='mt-2 flex items-center gap-3'>
+                    <button
+                      className='text-[#3ea6ff] hover:underline'
+                      onClick={() => setRepliesOpen(false)}
+                    >
+                      답글 닫기
+                    </button>
+                    <div className='flex-1' />
+                    <button
+                      className='px-3 py-1.5 rounded-full text-xs bg-white/10 hover:bg-white/15'
+                      onClick={() => setReply('')}
+                    >
+                      취소
+                    </button>
+                    <button
+                      className='px-3 py-1.5 rounded-full text-xs bg-white text-black font-semibold disabled:opacity-50'
+                      onClick={submitReply}
+                      disabled={!reply.trim() || creatingReply}
+                    >
+                      답글
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
@@ -253,34 +274,39 @@ export default function CommentRow({
 }
 
 /** ▼ 대댓글 한 줄 — 훅을 여기서 호출 (map 내부 호출 금지) */
-function ReplyRow({ reply }: { reply: CommentNode }) {
+function ReplyRow({ reply, mediaId }: { reply: CommentNode; mediaId: string }) {
   const { open: openAuth } = useAuthModal();
   const me = typeof window !== 'undefined' ? loadUserProfile() : null;
-  const iAmReplyAuthor = me?.id && me.id === reply.author.id;
+
+  // FIX: author 안전 가드
+  const rAuthorId = reply.author?.id;
+  const iAmReplyAuthor = !!(me?.id && rAuthorId && me.id === rAuthorId);
 
   const {
     liked: rLiked,
     displayCount: rCount,
     toggle: rToggle,
     toggling: rToggling,
-  } = useCommentLike(reply.id, reply.likeCount);
+  } = useCommentLike(reply.id, reply.likeCount ?? 0);
 
   const { mutate: delReply, isPending: delReplying } = useDeleteComment();
 
+  const rIsDeleted = !!reply.isDeleted;
+
   return (
     <div className='flex items-start gap-2'>
-      <Avatar src={reply.author.avatarUrl} size={28} />
+      <Avatar src={reply.author?.avatarUrl ?? null} size={28} />
       <div className='flex-1 min-w-0'>
         <div className='flex items-center gap-2'>
           <div className='text-sm font-semibold'>
-            {reply.author.displayName}
+            {reply.author?.displayName ?? '알 수 없음'}
           </div>
           <div className='text-xs text-white/40'>
             {timeAgo(reply.createdAt)}
           </div>
         </div>
         <div className='mt-1 text-[14px] leading-5'>
-          {reply.isDeleted ? (
+          {rIsDeleted ? (
             <span className='text-white/40'>(삭제됨)</span>
           ) : (
             reply.text
@@ -289,15 +315,22 @@ function ReplyRow({ reply }: { reply: CommentNode }) {
 
         <div className='mt-1 flex items-center gap-4 text-xs text-white/60'>
           <button
-            className={`hover:text-white inline-flex items-center gap-1 ${rLiked ? 'text-white' : ''}`}
+            className={`hover:text-white inline-flex items-center gap-1 ${!rIsDeleted && rLiked ? 'text-white' : ''}`}
             onClick={() => {
               if (!hasStoredToken()) {
                 openAuth('login');
                 return;
               }
+              if (rIsDeleted) return; // FIX
               rToggle();
             }}
-            disabled={rToggling}
+            disabled={rToggling || rIsDeleted}
+            aria-disabled={rToggling || rIsDeleted}
+            title={
+              rIsDeleted
+                ? '삭제된 댓글에는 좋아요를 사용할 수 없어요'
+                : '좋아요'
+            }
           >
             <Image
               src={rLiked ? '/images/like.png' : '/images/empty_heart.png'}
@@ -317,7 +350,12 @@ function ReplyRow({ reply }: { reply: CommentNode }) {
                   openAuth('login');
                   return;
                 }
-                delReply({ commentId: reply.id });
+                // FIX: mediaId 전달
+                delReply({
+                  mediaId,
+                  commentId: reply.id,
+                  parentId: reply.parentId ?? null,
+                });
               }}
               disabled={delReplying}
             >

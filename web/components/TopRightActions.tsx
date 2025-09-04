@@ -208,14 +208,7 @@ export default function TopRightActions(props: Partial<typeof DEFAULTS>) {
                 120
               );
             }}
-          >
-            <button
-              onClick={doLogout}
-              className='px-3 py-1 rounded bg-white/10 border border-white/20 text-sm hover:bg-white/20'
-            >
-              로그아웃
-            </button>
-          </div>
+          ></div>
         </div>
       )}
     </div>

@@ -2,10 +2,8 @@ import {
   Body,
   Controller,
   Get,
-  Param,
   Patch,
   Post,
-  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -20,11 +18,6 @@ import { LoginDto, SignupDto, MyProfileDto } from './dto';
 import { JwtAuthGuard } from './jwt/jwt-auth.guard';
 import { UsersService } from '../users/users.service';
 import { UpdateProfileDto } from '../users/dto/update-profile.dto';
-import { PublicUserDto } from '../users/dto/public-user.dto';
-import {
-  UserMediaQueryDto,
-  UserMediaResponseDto,
-} from '../users/dto/user-media.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -73,33 +66,5 @@ export class AuthController {
       displayName: user.displayName,
       avatarUrl: user.avatarUrl ?? null,
     };
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Patch('me')
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: '내 프로필 수정' })
-  async updateMe(@Req() req: any, @Body() dto: UpdateProfileDto) {
-    return this.usersService.updateMe(req.user.userId as string, dto);
-  }
-
-  // --- 공개 프로필 + 공개 미디어 ---
-  @Get(':id')
-  @ApiOperation({ summary: '공개 프로필 조회' })
-  @ApiOkResponse({ type: PublicUserDto })
-  async publicProfile(@Param('id') id: string): Promise<PublicUserDto> {
-    return this.usersService.getPublicProfile(id);
-  }
-
-  @Get(':id/media')
-  @ApiOperation({
-    summary: '특정 사용자의 공개 미디어 목록(커서 페이지네이션)',
-  })
-  @ApiOkResponse({ type: UserMediaResponseDto })
-  async userMedia(
-    @Param('id') id: string,
-    @Query() q: UserMediaQueryDto,
-  ): Promise<UserMediaResponseDto> {
-    return this.usersService.getUserMedia(id, q);
   }
 }

@@ -2,13 +2,14 @@ import './globals.css';
 import type { Metadata } from 'next';
 import Providers from '@/components/Providers';
 import dynamic from 'next/dynamic';
-import TopLeftBrand from '@/components/TopLeftBrand';
 
 // 우상단 액션바는 클라이언트 전용(SSR 불일치 방지)
 const TopRightActions = dynamic(() => import('@/components/TopRightActions'), {
   ssr: false,
 });
-
+const LeftSidebar = dynamic(() => import('@/components/LeftSidebar'), {
+  ssr: false,
+});
 // 모달/컨텍스트
 import { AuthModalProvider } from '@/contexts/AuthModalContext';
 import { UploadModalProvider } from '@/contexts/UploadModalContext';
@@ -42,12 +43,8 @@ export default function RootLayout({
             <UploadModalProvider>
               <ShareModalProvider>
                 <CommentsPanelProvider>
-                  {/* 좌측 상단 배너 아이콘 (크기/위치 숫자로 쉽게 조절) */}
-                  <TopLeftBrand
-                    left={20} // px
-                    top={-20} // px
-                    size={160} // px (정사각)
-                  />
+                  {/* 좌측 네비게이션 */}
+                  <LeftSidebar width={220} logoWidth={160} logoHeight={70} />
                   {/* 우측 상단: 업로드/로그인/아바타 */}
                   <TopRightActions />
                   {/* 로그인/회원가입 모달 */}
