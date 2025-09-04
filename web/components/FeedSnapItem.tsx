@@ -28,7 +28,9 @@ export default function FeedSnapItem({
 }) {
   const streamUrl = useMemo(() => joinHls(node.hlsKey), [node.hlsKey]);
   const audioKind = isAudio(node);
-  const title = filenameWithoutExt(node.originalFilename);
+  const title =
+    (node.title && node.title.trim()) ||
+    filenameWithoutExt(node.originalFilename);
 
   const { open: openShare } = useShareModal();
   const { liked, count, toggle } = useMediaLike(node.id);
