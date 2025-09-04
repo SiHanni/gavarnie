@@ -1,60 +1,35 @@
-// web/src/hooks/useFollow.ts
 'use client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  followUser,
-  unfollowUser,
-  getFollowStatus,
-  getFollowerCount,
-} from '@/lib/http';
+import { followUser, unfollowUser, getFollowStatus } from '@/lib/http';
 
-export function useFollow(userId: string | null) {
+export function useFollow(targetUserId: string) {
   const qc = useQueryClient();
+  const qKey = ['isFollowing', targetUserId];
 
-  // 상태 조회
-  const statusQ = useQuery({
-    queryKey: ['follow', 'status', userId],
-    queryFn: () => getFollowStatus(userId!),
-    enabled: !!userId,
+  const q = useQuery({
+    queryKey: qKey,
+    queryFn: () => getFollowStatus(targetUserId),
   });
 
-  // 카운트 조회
-  const countQ = useQuery({
-    queryKey: ['follow', 'followers-count', userId],
-    queryFn: () => getFollowerCount(userId!),
-    enabled: !!userId,
-  });
-
-  const followMut = useMutation({
-    mutationFn: () => followUser(userId!),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['follow', 'status', userId] });
-      qc.invalidateQueries({ queryKey: ['follow', 'followers-count', userId] });
+  const mut = useMutation({
+    mutationFn: async (now: boolean) => {
+      return now ? unfollowUser(targetUserId) : followUser(targetUserId);
     },
-  });
-
-  const unfollowMut = useMutation({
-    mutationFn: () => unfollowUser(userId!),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['follow', 'status', userId] });
-      qc.invalidateQueries({ queryKey: ['follow', 'followers-count', userId] });
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: qKey });
+      const prev = qc.getQueryData<{ following: boolean }>(qKey);
+      qc.setQueryData(qKey, { following: !prev?.following });
+      return { prev };
     },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(qKey, ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: qKey }),
   });
-
-  const toggle = () => {
-    const following = statusQ.data?.following ?? false;
-    return following ? unfollowMut.mutate() : followMut.mutate();
-  };
 
   return {
-    following: statusQ.data?.following ?? false,
-    followerCount: countQ.data?.count ?? 0,
-    isLoading: statusQ.isLoading || countQ.isLoading,
-    toggling: followMut.isPending || unfollowMut.isPending,
-    toggle,
-    refetch: () => {
-      statusQ.refetch();
-      countQ.refetch();
-    },
+    isFollowing: !!q.data?.following,
+    isLoading: q.isLoading || mut.isPending,
+    toggle: () => mut.mutate(!!q.data?.following),
   };
 }
