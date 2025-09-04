@@ -6,3 +6,4 @@ export * from './media/comment.entity';
 export * from './media/comment-reaction.entity';
 
 export * from './user/user.entity';
+export * from './user/user-follows.entity';

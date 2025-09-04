@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { MediaCore } from '../media/media-core.entity';
 
+export type UserGrade = 'basic' | 'plus' | 'premium';
 @Entity('users')
 @Unique(['email'])
 export class User {
@@ -23,6 +24,14 @@ export class User {
 
   @Column({ name: 'display_name', type: 'varchar', length: 100 })
   displayName!: string;
+
+  @Column({
+    name: 'user_grade',
+    type: 'enum',
+    enum: ['basic', 'plus', 'premium'],
+    default: 'basic',
+  })
+  userGrade!: UserGrade;
 
   @Column({ name: 'avatar_url', type: 'varchar', length: 500, nullable: true })
   avatarUrl?: string | null;

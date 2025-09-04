@@ -1,13 +1,13 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export default class CreateUserFollow20250905005500
+export default class CreateUserFollows20250905005500
   implements MigrationInterface
 {
-  name = 'CreateUserFollow20250905013305';
+  name = 'CreateUserFollows20250905013305';
 
   public async up(q: QueryRunner): Promise<void> {
     await q.query(`
-      CREATE TABLE IF NOT EXISTS user_follow (
+      CREATE TABLE IF NOT EXISTS user_follows (
         id BIGINT PRIMARY KEY AUTO_INCREMENT,
         follower_id BIGINT NOT NULL,
         followee_id BIGINT NOT NULL,
@@ -23,17 +23,17 @@ export default class CreateUserFollow20250905005500
     `);
 
     await q.query(`
-      CREATE INDEX idx_user_follow_follower_active
-      ON user_follow (follower_id, is_active);
+      CREATE INDEX idx_user_follows_follower_active
+      ON user_follows (follower_id, is_active);
     `);
 
     await q.query(`
-      CREATE INDEX idx_user_follow_followee_active
-      ON user_follow (followee_id, is_active);
+      CREATE INDEX idx_user_follows_followee_active
+      ON user_follows (followee_id, is_active);
     `);
   }
 
   public async down(q: QueryRunner): Promise<void> {
-    await q.query(`DROP TABLE IF EXISTS user_follow;`);
+    await q.query(`DROP TABLE IF EXISTS user_follows;`);
   }
 }
