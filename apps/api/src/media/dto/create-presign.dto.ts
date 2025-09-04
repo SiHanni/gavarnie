@@ -1,9 +1,10 @@
 import {
-  IsIn,
+  //IsIn,
   IsMimeType,
   IsNotEmpty,
   IsOptional,
   IsString,
+  MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -13,13 +14,20 @@ export class CreatePresignDto {
   @IsNotEmpty()
   originalFilename!: string;
 
+  @ApiProperty({ example: 'F1 팀라디오 알림사운드' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  title?: string;
+
   @ApiProperty({ example: 'audio/mpeg' })
   @IsOptional()
   @IsMimeType()
   contentType?: string;
 
-  @ApiPropertyOptional({ enum: ['video', 'audio'] })
-  @IsOptional()
-  @IsIn(['video', 'audio'])
-  kind?: 'video' | 'audio';
+  // DEPRECATED
+  //@ApiPropertyOptional({ enum: ['video', 'audio'] })
+  //@IsOptional()
+  //@IsIn(['video', 'audio'])
+  //kind?: 'video' | 'audio';
 }

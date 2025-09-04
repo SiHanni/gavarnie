@@ -23,11 +23,12 @@ import {
   inferKindByExtOrMime,
 } from './utils/media-infer';
 
-type GetRecentArgs = {
-  limit: number;
+type GetRecentParams = {
+  limit?: number;
   cursor?: string;
   currentUserId?: string;
 };
+
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
@@ -42,14 +43,20 @@ export class MediaService {
     private readonly mediaReactionRepository: Repository<MediaReaction>,
     @InjectRepository(Comment)
     private readonly commentRepository: Repository<Comment>,
-    @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly s3: S3Service,
     @Inject(TRANSCODE_QUEUE) private readonly transcodeQueue: Queue,
   ) {}
 
+  /** */
+  private getFilenameWithoutExtension(name: string) {
+    const base = path.basename(name);
+    return base.replace(/\.[^.]+$/, '');
+  }
+
   /**
    * 업로드 대상의 mime 판단 (audio/video)
    * @param contentType
+   * - video/mp4, audio/mpeg 등
    * @param filename
    * @returns
    */
@@ -96,13 +103,11 @@ export class MediaService {
     originalFilename: string,
     contentType: string | undefined,
     ownerId: string,
-    kind?: Kind,
+    title: string | undefined,
   ) {
     // 0) 서버 추론
     const resolvedContentType =
       contentType ?? guessContentType(originalFilename);
-    const resolvedKind =
-      kind ?? inferKindByExtOrMime(originalFilename, resolvedContentType);
 
     // 1) 화이트리스트 체크
     this.ensureAllowed(resolvedContentType, originalFilename);
@@ -110,6 +115,12 @@ export class MediaService {
     const id = uuidv4();
     const safeName = originalFilename.replace(/[^\w.\-()+\[\]{}@]/g, '_');
     const key = `original/${id}/${safeName}`;
+
+    // 타이틀 처리const displayTitleRaw = (title ?? '').trim();
+    const baseTitle = this.getFilenameWithoutExtension(originalFilename);
+    const requestedDisplayTitle = (title ?? '').trim();
+    const displayTitle =
+      requestedDisplayTitle.length > 0 ? requestedDisplayTitle : baseTitle;
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -130,7 +141,7 @@ export class MediaService {
         mediaId: id,
         ownerId,
         status: 'processing',
-        title: originalFilename,
+        title: displayTitle,
         description: null,
         durationSec: null,
         publishedAt: null,
@@ -248,7 +259,7 @@ export class MediaService {
    * 커서 조건: (createdAt, id) 튜플의 "엄격히 이전"만 가져오기
    *
    */
-  async getRecent(dto: RecentQueryDto): Promise<RecentResponseDto> {
+  async getRecent(dto: GetRecentParams): Promise<RecentResponseDto> {
     const limit = dto.limit ?? 20;
     const cursor = decodeCursor(dto.cursor);
 
@@ -283,7 +294,8 @@ export class MediaService {
       'media.content_type   AS m_content_type',
       'media.size           AS m_size',
       'media.created_at     AS m_created_at',
-      'mediaCore.id            AS mc_id',
+      'mediaCore.id         AS mc_id',
+      'mediaCore.title      AS mc_title',
       'owner.id             AS owner_id',
       'owner.display_name   AS owner_display_name',
       'owner.avatar_url     AS owner_avatar_url',
@@ -296,7 +308,8 @@ export class MediaService {
       m_content_type: string;
       m_size: string | number | null;
       m_created_at: Date;
-      mc_id: string; // BIGINT
+      mc_id: string;
+      mc_title: string;
       owner_id: string;
       owner_display_name: string;
       owner_avatar_url: string | null;
@@ -360,6 +373,7 @@ export class MediaService {
       id: r.m_id,
       hlsKey: r.m_hls_key ?? '',
       originalFilename: r.m_original_filename,
+      title: r.mc_title,
       contentType: r.m_content_type,
       size: r.m_size === null ? null : Number(r.m_size),
       createdAt: new Date(r.m_created_at).toISOString(),
