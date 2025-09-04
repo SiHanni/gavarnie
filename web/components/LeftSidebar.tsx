@@ -18,6 +18,13 @@ import {
   type UserProfile,
 } from '@/lib/user';
 
+const BRAND = '#5a319f';
+const GRADE_LABEL: Record<'basic' | 'plus' | 'premium', string> = {
+  basic: 'Basic',
+  plus: 'Plus',
+  premium: 'Premium',
+};
+
 type Props = {
   width?: number;
   logoSrc?: string;
@@ -40,7 +47,7 @@ export default function LeftSidebar({
   const router = useRouter();
   const pathname = usePathname();
 
-  // ⬇️ 약관 페이지에서는 사이드바 숨김
+  // 약관 페이지에선 사이드바 숨김
   if (pathname?.startsWith('/terms')) return null;
 
   const { open: openUpload } = useUploadModal();
@@ -187,10 +194,9 @@ export default function LeftSidebar({
           )}
         </nav>
 
-        {/* ▼ 로그인 버튼 바로 아래: 약관/정책 링크(티톡 스타일 참고) */}
+        {/* 약관/정책 링크 */}
         <div className='mt-6 mx-3 border-t border-white/10' />
         <div className='px-3 pt-4 pb-2 text-[13px] text-white/60 space-y-2'>
-          {/* 필요시 /about, /programs 페이지를 만들거나 #로 두세요 */}
           <div className='hover:text-white transition-colors'>
             <Link href='/about'>회사</Link>
           </div>
@@ -198,15 +204,22 @@ export default function LeftSidebar({
             <Link href='/terms'>약관 및 정책</Link>
           </div>
         </div>
-        <div className='px-3 pt-1 text-[12px] text-white/40 mt-auto mb-3'>
-          © {new Date().getFullYear()} Catarie
-        </div>
 
-        {/* 하단 내 정보(로그인 시) */}
+        {/* 하단 프로필 카드 (전체가 버튼) */}
         {loggedIn && (
-          <div className='mb-4 mr-3'>
-            <div className='flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2'>
-              <div className='w-9 h-9 overflow-hidden rounded-full border border-white/20'>
+          // ▼ 카드 위치를 아래로: mt-auto 추가 + 여백 살짝 키움
+          <div className='mt-auto mb-40 mr-3'>
+            <button
+              type='button'
+              onClick={goProfile}
+              aria-label='내 프로필로 이동'
+              // ▼ 이름을 오른쪽으로: gap-4로 간격 확대
+              className='w-full flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2
+                         hover:bg-white/10 hover:border-white/20 transition-colors
+                         focus:outline-none focus:ring-2 focus:ring-[#5a319f]/60'
+            >
+              {/* 아바타 */}
+              <div className='w-11 h-11 overflow-hidden rounded-full border border-white/20'>
                 {me!.avatarUrl ? (
                   <img
                     src={me!.avatarUrl}
@@ -220,18 +233,45 @@ export default function LeftSidebar({
                   </div>
                 )}
               </div>
-              <div className='truncate'>
-                <div className='text-white/90 text-sm truncate'>
+
+              {/* 텍스트: 뱃지 ↑, 이름 ↓ */}
+              <div className='min-w-0 text-left'>
+                {!!me?.userGrade && (
+                  // ▼ 뱃지 더 크게: 패딩/폰트 업
+                  <span
+                    className='inline-block px-3 py-1 rounded-full text-[12px] md:text-[13px] font-semibold border'
+                    style={{
+                      color: BRAND,
+                      backgroundColor: 'rgba(90,49,159,0.15)',
+                      borderColor: 'rgba(90,49,159,0.35)',
+                    }}
+                    title={`회원 등급: ${
+                      GRADE_LABEL[
+                        (me!.userGrade as 'basic' | 'plus' | 'premium') ||
+                          'basic'
+                      ]
+                    }`}
+                  >
+                    {
+                      GRADE_LABEL[
+                        (me!.userGrade as 'basic' | 'plus' | 'premium') ||
+                          'basic'
+                      ]
+                    }
+                  </span>
+                )}
+                {/* ▼ 이름을 한 칸 더 밀기: ml-2 + 글자 조금 키움 */}
+                <div
+                  className='mt-1 ml-2 text-white/90 text-[15px] leading-tight break-words line-clamp-2'
+                  title={me!.displayName || me!.email}
+                >
                   {me!.displayName || me!.email}
                 </div>
-                <button
-                  type='button'
-                  onClick={goProfile}
-                  className='text-xs text-white/60 hover:text-white'
-                >
-                  내 프로필 보기 →
-                </button>
               </div>
+            </button>
+
+            <div className='px-3 pt-1 text-[12px] text-white/40 mt-auto mb-3'>
+              © {new Date().getFullYear()} Catarie
             </div>
           </div>
         )}
@@ -258,7 +298,11 @@ function SideItem({
       type='button'
       onClick={onClick}
       className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors
-        ${active ? 'bg-white/15 border-white/15' : 'hover:bg-white/10 hover:border-white/10 border-transparent'}
+        ${
+          active
+            ? 'bg-white/15 border-white/15'
+            : 'hover:bg-white/10 hover:border-white/10 border-transparent'
+        }
       `}
     >
       <span className='inline-flex items-center gap-3'>

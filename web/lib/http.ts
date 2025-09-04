@@ -243,3 +243,32 @@ export async function mediaLikeCount(mediaUuid: string) {
     method: 'GET',
   });
 }
+
+export async function followUser(targetUserId: string) {
+  return request<{ following: boolean; alreadyExisted: boolean }>({
+    url: `/users/${targetUserId}/follow`,
+    method: 'POST',
+  });
+}
+
+export async function unfollowUser(targetUserId: string) {
+  return request<{ following: boolean; alreadyExisted: boolean }>({
+    url: `/users/${targetUserId}/follow`,
+    method: 'DELETE',
+  });
+}
+
+export async function getFollowerCount(userId: string) {
+  return request<{ count: number }>({
+    url: `/users/${userId}/followers/count`,
+    method: 'GET',
+  });
+}
+
+export async function getFollowStatus(userId: string) {
+  // (Jwt 필요) 내가 userId를 팔로우 중인지
+  return request<{ following: boolean }>({
+    url: `/users/${userId}/follow/status`,
+    method: 'GET',
+  });
+}
