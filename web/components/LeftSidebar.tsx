@@ -31,6 +31,9 @@ type Props = {
   paddingLeft?: number;
 };
 
+// ✅ 아이콘 크기 한 번에 조절 (px)
+const ICON_SIZE = 28;
+
 export default function LeftSidebar({
   width = 260,
   logoSrc = '/images/banner.png',
@@ -85,12 +88,10 @@ export default function LeftSidebar({
 
   const loggedIn = mounted && hasToken && !!getAccessToken() && !!me;
 
-  // ✅ 홈 배너 클릭: 홈이면 새로고침, 아니면 홈으로 이동
+  // 홈: 홈이면 컨텐츠만 새로고침, 아니면 홈으로 이동
   const goHome = () => {
     if (pathname === '/') {
-      // 완전 새로고침이 의도라면 reload 사용
-      //window.location.reload();
-      window.dispatchEvent(new CustomEvent('feed:refresh'));
+      window.dispatchEvent(new CustomEvent('feed:refresh')); // 컨텐츠만 갱신
       return;
     }
     router.push('/');
@@ -126,7 +127,7 @@ export default function LeftSidebar({
         className='flex flex-col h-full'
         style={{ paddingTop, paddingLeft, paddingRight: 12 }}
       >
-        {/* === 배너: 배경/테두리 없음, 클릭 영역 = 이미지 크기 === */}
+        {/* 배너 */}
         <button
           type='button'
           onClick={goHome}
@@ -153,12 +154,40 @@ export default function LeftSidebar({
 
         {/* 메뉴 */}
         <nav className='mt-6 flex flex-col gap-2 text-[15px]'>
-          <SideItem label='업로드' onClick={doUpload} />
-          <SideItem label='프로필' onClick={goProfile} />
+          {/* 홈 (업로드 위에 추가) */}
+          <SideItem
+            label='홈'
+            iconSrc='/images/Home.png'
+            onClick={goHome}
+            active={pathname === '/'}
+            iconSize={ICON_SIZE}
+          />
+          <SideItem
+            label='업로드'
+            iconSrc='/images/shinewaterdrop.png'
+            onClick={doUpload}
+            iconSize={ICON_SIZE}
+          />
+          <SideItem
+            label='프로필'
+            iconSrc='/images/profile.png'
+            onClick={goProfile}
+            iconSize={ICON_SIZE}
+          />
           {!loggedIn ? (
-            <SideItem label='로그인' onClick={() => openAuth('login')} />
+            <SideItem
+              label='로그인'
+              iconSrc='/images/login.png'
+              onClick={() => openAuth('login')}
+              iconSize={ICON_SIZE}
+            />
           ) : (
-            <SideItem label='로그아웃' onClick={doLogout} />
+            <SideItem
+              label='로그아웃'
+              iconSrc='/images/logout.png'
+              onClick={doLogout}
+              iconSize={ICON_SIZE}
+            />
           )}
         </nav>
 
@@ -200,14 +229,43 @@ export default function LeftSidebar({
   );
 }
 
-function SideItem({ label, onClick }: { label: string; onClick: () => void }) {
+function SideItem({
+  label,
+  iconSrc,
+  onClick,
+  active,
+  iconSize = 28, // ✅ 기본 아이콘 크기 (px)
+}: {
+  label: string;
+  iconSrc?: string;
+  onClick: () => void;
+  active?: boolean;
+  iconSize?: number;
+}) {
   return (
     <button
       type='button'
       onClick={onClick}
-      className='w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 focus:bg-white/10 border border-transparent hover:border-white/10'
+      className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors
+        ${active ? 'bg-white/15 border-white/15' : 'hover:bg-white/10 hover:border-white/10 border-transparent'}
+      `}
     >
-      {label}
+      <span className='inline-flex items-center gap-3'>
+        {iconSrc && (
+          <img
+            src={iconSrc}
+            alt=''
+            width={iconSize}
+            height={iconSize}
+            style={{ width: iconSize, height: iconSize }}
+            className='inline-block align-[-2px]'
+            draggable={false}
+            decoding='async'
+            loading='lazy'
+          />
+        )}
+        {label}
+      </span>
     </button>
   );
 }
