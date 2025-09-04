@@ -203,7 +203,7 @@ export default function FeedSnapItem({
             <div className='absolute inset-x-0 bottom-0 z-20'>
               <ProgressBar
                 className='px-3'
-                barHeight={8}
+                barHeight={6}
                 progress={dur > 0 ? curr / dur : 0}
                 buffered={buf}
                 duration={dur}

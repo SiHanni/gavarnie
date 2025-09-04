@@ -1,6 +1,6 @@
-// components/LeftSidebar.tsx
 'use client';
 
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useUploadModal } from '@/contexts/UploadModalContext';
@@ -19,19 +19,14 @@ import {
 } from '@/lib/user';
 
 type Props = {
-  /** 사이드바 폭(px) */
   width?: number;
-  /** 배너 이미지 경로 (public/ 경로 권장) */
   logoSrc?: string;
-  /** 배너 표시 너비/높이(px) */
   logoWidth?: number;
   logoHeight?: number;
-  /** 배너 바깥 여백 */
   paddingTop?: number;
   paddingLeft?: number;
 };
 
-// ✅ 아이콘 크기 한 번에 조절 (px)
 const ICON_SIZE = 28;
 
 export default function LeftSidebar({
@@ -44,6 +39,9 @@ export default function LeftSidebar({
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // ⬇️ 약관 페이지에서는 사이드바 숨김
+  if (pathname?.startsWith('/terms')) return null;
 
   const { open: openUpload } = useUploadModal();
   const { open: openAuth } = useAuthModal();
@@ -88,10 +86,9 @@ export default function LeftSidebar({
 
   const loggedIn = mounted && hasToken && !!getAccessToken() && !!me;
 
-  // 홈: 홈이면 컨텐츠만 새로고침, 아니면 홈으로 이동
   const goHome = () => {
     if (pathname === '/') {
-      window.dispatchEvent(new CustomEvent('feed:refresh')); // 컨텐츠만 갱신
+      window.dispatchEvent(new CustomEvent('feed:refresh'));
       return;
     }
     router.push('/');
@@ -119,7 +116,7 @@ export default function LeftSidebar({
 
   return (
     <aside
-      className='fixed left-0 top-0 h-[100svh] z-[80] bg-black/60 backdrop-blur-sm'
+      className='fixed left-0 top-0 h-[100svh] z-[80] bg-black/60 backdrop-blur-sm text-white'
       style={{ width }}
       aria-label='왼쪽 내비게이션'
     >
@@ -154,7 +151,6 @@ export default function LeftSidebar({
 
         {/* 메뉴 */}
         <nav className='mt-6 flex flex-col gap-2 text-[15px]'>
-          {/* 홈 (업로드 위에 추가) */}
           <SideItem
             label='홈'
             iconSrc='/images/Home.png'
@@ -191,9 +187,24 @@ export default function LeftSidebar({
           )}
         </nav>
 
+        {/* ▼ 로그인 버튼 바로 아래: 약관/정책 링크(티톡 스타일 참고) */}
+        <div className='mt-6 mx-3 border-t border-white/10' />
+        <div className='px-3 pt-4 pb-2 text-[13px] text-white/60 space-y-2'>
+          {/* 필요시 /about, /programs 페이지를 만들거나 #로 두세요 */}
+          <div className='hover:text-white transition-colors'>
+            <Link href='/about'>회사</Link>
+          </div>
+          <div className='hover:text-white transition-colors'>
+            <Link href='/terms'>약관 및 정책</Link>
+          </div>
+        </div>
+        <div className='px-3 pt-1 text-[12px] text-white/40 mt-auto mb-3'>
+          © {new Date().getFullYear()} Catarie
+        </div>
+
         {/* 하단 내 정보(로그인 시) */}
         {loggedIn && (
-          <div className='mt-auto mb-4 mr-3'>
+          <div className='mb-4 mr-3'>
             <div className='flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2'>
               <div className='w-9 h-9 overflow-hidden rounded-full border border-white/20'>
                 {me!.avatarUrl ? (
@@ -234,7 +245,7 @@ function SideItem({
   iconSrc,
   onClick,
   active,
-  iconSize = 28, // ✅ 기본 아이콘 크기 (px)
+  iconSize = 28,
 }: {
   label: string;
   iconSrc?: string;

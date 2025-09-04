@@ -15,6 +15,7 @@ import {
   type UserProfile,
 } from '@/lib/user';
 import { useUploadModal } from '@/contexts/UploadModalContext';
+import { usePathname } from 'next/navigation';
 
 const DEFAULTS = {
   top: 20,
@@ -28,6 +29,8 @@ const DEFAULTS = {
 };
 
 export default function TopRightActions(props: Partial<typeof DEFAULTS>) {
+  const pathname = usePathname();
+  if (pathname?.startsWith('/terms')) return null;
   const {
     top = DEFAULTS.top,
     right = DEFAULTS.right,

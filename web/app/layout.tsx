@@ -36,31 +36,33 @@ export default function RootLayout({
 }) {
   return (
     <html lang='ko'>
-      {/* 전체 페이지를 검정으로, 페이지 자체 스크롤은 숨김(피드가 스크롤 담당) */}
-      <body className='min-h-[100svh] bg-black text-white overflow-hidden'>
-        <Providers>
-          <AuthModalProvider>
-            <UploadModalProvider>
-              <ShareModalProvider>
-                <CommentsPanelProvider>
-                  {/* 좌측 네비게이션 */}
-                  <LeftSidebar width={220} logoWidth={160} logoHeight={70} />
-                  {/* 우측 상단: 업로드/로그인/아바타 */}
-                  <TopRightActions />
-                  {/* 로그인/회원가입 모달 */}
-                  <AuthModal />
-                  {/* 업로드 모달 */}
-                  <UploadModal />
-                  {/* 공유 모달 */}
-                  <ShareModal />
-                  {/* 실제 페이지 */}
-                  <CommentsPanel />
-                  {children}
-                </CommentsPanelProvider>
-              </ShareModalProvider>
-            </UploadModalProvider>
-          </AuthModalProvider>
-        </Providers>
+      <body className='scroll-smooth'>
+        {/* 전체 페이지를 검정으로, 페이지 자체 스크롤은 숨김(피드가 스크롤 담당) */}
+        <body className='min-h-[100svh] bg-black text-white overflow-hidden'>
+          <Providers>
+            <AuthModalProvider>
+              <UploadModalProvider>
+                <ShareModalProvider>
+                  <CommentsPanelProvider>
+                    {/* 좌측 네비게이션 */}
+                    <LeftSidebar width={220} logoWidth={160} logoHeight={70} />
+                    {/* 우측 상단: 업로드/로그인/아바타 */}
+                    <TopRightActions />
+                    {/* 로그인/회원가입 모달 */}
+                    <AuthModal />
+                    {/* 업로드 모달 */}
+                    <UploadModal />
+                    {/* 공유 모달 */}
+                    <ShareModal />
+                    {/* 실제 페이지 */}
+                    <CommentsPanel />
+                    {children}
+                  </CommentsPanelProvider>
+                </ShareModalProvider>
+              </UploadModalProvider>
+            </AuthModalProvider>
+          </Providers>
+        </body>
       </body>
     </html>
   );
