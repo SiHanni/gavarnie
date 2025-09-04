@@ -6,6 +6,7 @@
  * - 마지막 근처에서 다음 페이지 자동 로드
  * - 키보드 ↑/↓ (PgUp/PgDn, Space)로도 한 장씩 이동
  * - ⬆️ 위로 올려 맨 위에 닿으면 최신 컨텐츠 유무를 빠르게 확인 후, 있으면 부드럽게 리프레시
+ * - 홈 배너 클릭 시(LeftSidebar → feed:refresh 이벤트) 콘텐츠만 새로고침
  */
 
 import { useEffect, useMemo, useRef } from 'react';
@@ -21,7 +22,7 @@ type RecentHeadResp = {
 };
 
 export default function FullPageFeed() {
-  // 한 페이지당 가져올 개수 (너의 현재 코드에서 6 사용)
+  // 한 페이지당 가져올 개수 (현재 6 사용)
   const limit = 6;
 
   const {
@@ -31,6 +32,8 @@ export default function FullPageFeed() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    refetch,
+    refreshHard, // 쿼리캐시 완전 리셋
   } = useInfiniteRecent(limit);
 
   // 스크롤 컨테이너 ref (키보드 네비게이션 & 스냅)
@@ -66,6 +69,20 @@ export default function FullPageFeed() {
     el.addEventListener('keydown', onKey);
     return () => el.removeEventListener('keydown', onKey);
   }, []);
+
+  // ====== 홈 배너 클릭 → feed:refresh → 컨텐츠만 새로고침 ======
+  useEffect(() => {
+    const onRefresh = () => {
+      const el = containerRef.current;
+      if (el) el.scrollTo({ top: 0, behavior: 'smooth' });
+      // 캐시 제거 후 즉시 리패치(커서 초기화)
+      refreshHard();
+      setTimeout(() => refetch(), 0);
+    };
+    window.addEventListener('feed:refresh', onRefresh as EventListener);
+    return () =>
+      window.removeEventListener('feed:refresh', onRefresh as EventListener);
+  }, [refreshHard, refetch]);
 
   // ====== ⬆️ 맨 위에서 최신 확인 → 있으면 부드럽게 invalidate ======
   const qc = useQueryClient();
@@ -112,7 +129,6 @@ export default function FullPageFeed() {
         const headId = await fetchRecentHeadId();
         // 우리가 알고 있는 최신 id와 다르면 새 글이 생긴 것 → invalidate로 부드럽게 리페치
         if (headId && headId !== latestKnownFirstId) {
-          // useInfiniteRecent(limit)의 쿼리키와 맞춰 invalidate
           await qc.invalidateQueries({ queryKey: ['recent', limit] });
           latestKnownFirstId = headId; // 이후 중복 invalidate 방지
         }

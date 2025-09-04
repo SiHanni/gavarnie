@@ -149,7 +149,7 @@ export function hasStoredToken(): boolean {
   return !!localStorage.getItem(KEY);
 }
 
-// 2) 프로필 조회 API (/auth/profile)
+// ===== 프로필 =====
 export type ProfileResponse = {
   id: string;
   email: string;
@@ -157,8 +157,67 @@ export type ProfileResponse = {
   avatarUrl: string | null;
 };
 
+/** 내 프로필 (우선 /users/profile, 실패 시 /auth/profile 폴백) */
 export async function fetchProfile(): Promise<ProfileResponse> {
-  return request<ProfileResponse>({ url: '/auth/profile', method: 'GET' });
+  try {
+    return await request<ProfileResponse>({
+      url: '/users/profile',
+      method: 'GET',
+    });
+  } catch {
+    return request<ProfileResponse>({ url: '/auth/profile', method: 'GET' });
+  }
+}
+
+/** 공개 프로필 */
+export type PublicUser = {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+};
+export async function fetchPublicUser(id: string) {
+  return request<PublicUser>({ url: `/users/${id}`, method: 'GET' });
+}
+
+/** 내 프로필 수정 */
+export async function updateMyProfile(dto: {
+  displayName?: string;
+  avatarUrl?: string | null;
+}) {
+  return request<ProfileResponse>({
+    url: '/users/me',
+    method: 'PATCH',
+    data: dto,
+  });
+}
+
+/** 특정 사용자의 공개 미디어 */
+export type UserMediaNode = {
+  id: string;
+  hlsKey: string;
+  originalFilename: string;
+  title: string;
+  contentType: string;
+  size: number | null;
+  createdAt: string;
+  author: { id: string; displayName: string; avatarUrl: string | null };
+  likeCount: number;
+  commentCount: number;
+};
+export type UserMediaResponse = {
+  nodes: UserMediaNode[];
+  pageInfo: { endCursor: string | null; hasNextPage: boolean };
+};
+export async function fetchUserMedia(
+  userId: string,
+  limit = 20,
+  cursor?: string
+) {
+  return request<UserMediaResponse>({
+    url: `/users/${userId}/media`,
+    method: 'GET',
+    params: { limit, cursor },
+  });
 }
 
 // ========= Media Reactions =========

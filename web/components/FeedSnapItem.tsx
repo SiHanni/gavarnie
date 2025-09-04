@@ -14,6 +14,7 @@ import { useMediaLike } from '@/hooks/useMediaLike';
 import { useShareModal } from '@/contexts/ShareModalContext';
 import ProgressBar from '@/components/ProgressBar';
 import { useCommentsPanel } from '@/contexts/CommentsPanelContext';
+import { useRouter } from 'next/navigation';
 
 function isAudio(node: RecentMediaNode) {
   return node.contentType?.startsWith('audio/');
@@ -26,6 +27,7 @@ export default function FeedSnapItem({
   node: RecentMediaNode;
   overlayAvatarSize?: number;
 }) {
+  const router = useRouter();
   const streamUrl = useMemo(() => joinHls(node.hlsKey), [node.hlsKey]);
   const audioKind = isAudio(node);
   const title =
@@ -271,8 +273,10 @@ export default function FeedSnapItem({
             {/* 하단 프로필/제목 */}
             <div className='absolute left-0 right-0 bottom-0 p-4 bg-gradient-to-t from-black/40 to-transparent z-10 pointer-events-none'>
               <div
-                className='flex items-center pointer-events-auto'
+                className='flex items-center pointer-events-auto cursor-pointer'
                 style={{ gap: NAME_GAP }}
+                onClick={() => router.push(`/users/${node.author.id}`)}
+                title={`${node.author.displayName}의 프로필로 이동`}
               >
                 <Avatar src={node.author.avatarUrl} size={AVATAR_SIZE} />
                 <div className='text-sm font-semibold'>
@@ -280,7 +284,7 @@ export default function FeedSnapItem({
                 </div>
               </div>
               <p className='mt-2 text-[13px] text-white/90 line-clamp-2 pointer-events-auto'>
-                {title}
+                {node.title}
               </p>
             </div>
           </div>
