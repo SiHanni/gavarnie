@@ -128,8 +128,9 @@ export default function TermsPage() {
                 </li>
                 <li>
                   <strong>무료 이용 한도:</strong> 결제하지 않은 경우{' '}
-                  <strong>일일 업로드 수는 10개</strong>로 제한됩니다. 기준
-                  시간은 <strong>UTC+9(한국시간) 00:00–24:00</strong>이며, 운영
+                  <strong>일일 업로드 수는 10개(Basic 등급 기준)</strong>로
+                  제한됩니다. 기준 시간은{' '}
+                  <strong>UTC+9(한국시간) 00:00–24:00</strong>이며, 운영
                   정책으로 조정될 수 있습니다.
                 </li>
                 <li>

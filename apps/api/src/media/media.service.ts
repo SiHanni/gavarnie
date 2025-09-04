@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Queue } from 'bullmq';
 import { v4 as uuidv4 } from 'uuid';
-import { HeadObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { S3Service } from '../storage/s3.service';
 import { Comment, Media, MediaReaction, User } from '@gavarnie/entities';
 import { MediaCore } from '@gavarnie/entities';
@@ -12,16 +12,9 @@ import { TRANSCODE_QUEUE } from '../queue/queue.module';
 import { MEDIA_EXTS } from './exts';
 import * as path from 'path';
 import { decodeCursor, encodeCursor } from './utils/cursor.util';
-import {
-  RecentQueryDto,
-  RecentResponseDto,
-  RecentMediaNode,
-} from './dto/recent.dto';
-import {
-  Kind,
-  guessContentType,
-  inferKindByExtOrMime,
-} from './utils/media-infer';
+import { RecentResponseDto, RecentMediaNode } from './dto/recent.dto';
+import { guessContentType } from './utils/media-infer';
+import { UPLOAD_POLICY, UserGrade } from './uploads/upload-policy';
 
 type GetRecentParams = {
   limit?: number;
@@ -41,6 +34,8 @@ export class MediaService {
     private readonly mediaCoreRepository: Repository<MediaCore>,
     @InjectRepository(MediaReaction)
     private readonly mediaReactionRepository: Repository<MediaReaction>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     @InjectRepository(Comment)
     private readonly commentRepository: Repository<Comment>,
     private readonly s3: S3Service,
@@ -190,31 +185,51 @@ export class MediaService {
       return { ok: true, id: media.id, status: media.status };
     }
 
-    const core = await this.mediaCoreRepository.findOne({
-      where: { mediaId: mediaId },
-    });
+    const core = await this.mediaCoreRepository.findOne({ where: { mediaId } });
     if (!core) throw new BadRequestException('media_core missing');
     if (core.ownerId !== ownerId)
       throw new ForbiddenException('not your media');
 
-    // HEAD로 실제 존재/사이즈 확인
-    // (S3Service 내부 필드 접근이 필요하면 public getter 제공하거나 여기서 S3Client, bucket 주입받도록 리팩토링 권장)
+    // 실제 오브젝트 사이즈 확인
     const anyS3 = this.s3 as any as {
       bucket: string;
       s3: import('@aws-sdk/client-s3').S3Client;
     };
     const head = await anyS3.s3.send(
-      new HeadObjectCommand({
-        Bucket: anyS3.bucket,
-        Key: key,
-      }),
+      new HeadObjectCommand({ Bucket: anyS3.bucket, Key: key }),
     );
     const actualSize = head.ContentLength ?? 0;
     if (!actualSize || actualSize <= 0) {
       throw new BadRequestException('object not found or zero size');
     }
 
-    media.size = actualSize ?? null;
+    // ⬇️ 등급별 용량 제한 2차 강제 (정책 위반 시 즉시 삭제 + ERROR 기록)
+    const owner = await this.userRepository.findOne({
+      where: { id: ownerId },
+      select: ['id', 'userGrade'],
+    });
+    const grade = ((owner?.userGrade as UserGrade) ?? 'basic') as UserGrade;
+    const { maxFileMB } = UPLOAD_POLICY[grade];
+    const maxBytes = maxFileMB * 1024 * 1024;
+
+    if (actualSize > maxBytes) {
+      // 1) S3 오브젝트 삭제 (비용/보안)
+      await anyS3.s3.send(
+        new DeleteObjectCommand({ Bucket: anyS3.bucket, Key: key }),
+      );
+      // 2) DB 상태를 오류로 남겨 원인 추적 가능하게
+      media.status = 'FAILED';
+      media.error = `FILE_TOO_LARGE:${actualSize}>${maxBytes} (grade=${grade})`;
+      await this.mediaRepository.save(media);
+
+      // 3) 사용자에게 명확한 메시지
+      throw new BadRequestException(
+        `파일이 등급 한도(${maxFileMB}MB)를 초과했습니다.`,
+      );
+    }
+
+    // 통과 → 큐 적재
+    media.size = actualSize;
     media.status = 'QUEUED';
     await this.mediaRepository.save(media);
 
@@ -223,7 +238,7 @@ export class MediaService {
       { mediaId: media.id, srcKey: media.srcKey },
       {
         jobId: media.id,
-        removeOnComplete: false, // 로컬 개발 중에는 성공하더라도 큐를 삭제하지 않도록 = false
+        removeOnComplete: false,
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
       },

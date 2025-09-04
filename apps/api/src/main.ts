@@ -31,7 +31,12 @@ async function bootstrap() {
       'http://127.0.0.1:3100',
     ],
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'x-file-size',
+    ],
     exposedHeaders: ['Content-Length', 'Content-Type'],
     credentials: false,
   });
