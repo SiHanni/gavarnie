@@ -33,6 +33,7 @@ export class UploadsController {
       dto.originalFilename,
       dto.contentType,
       req.user.userId as string,
+      dto.title,
     );
   }
 

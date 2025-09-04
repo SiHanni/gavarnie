@@ -28,14 +28,6 @@ export class RecentQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
-
-  @ApiProperty({
-    required: false,
-    description: '현재 로그인한 유저 아이디',
-  })
-  @IsOptional()
-  @IsString()
-  currentUserId?: string;
 }
 
 export class RecentMediaNode {
@@ -47,6 +39,9 @@ export class RecentMediaNode {
 
   @ApiProperty()
   originalFilename!: string;
+
+  @ApiProperty()
+  title!: string;
 
   @ApiProperty()
   contentType!: string;
