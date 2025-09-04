@@ -15,6 +15,7 @@ export interface RecentMediaNode {
   id: string; // 미디어 UUID
   hlsKey: string; // "hls/<uuid>/index.m3u8"
   originalFilename: string; // "#f1 실제속도 #shorts.mp4"
+  title: string;
   contentType: string; // "application/mp4" 등
   size?: number | null;
   createdAt: string; // ISO

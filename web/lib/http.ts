@@ -109,12 +109,12 @@ export type Presign =
 export async function presignUpload(
   originalFilename: string,
   contentType?: string,
-  kind?: 'video' | 'audio'
+  title?: string
 ) {
   return request<Presign>({
     url: '/uploads/presign',
     method: 'POST',
-    data: { originalFilename, contentType, kind },
+    data: { originalFilename, contentType, title },
   });
 }
 
