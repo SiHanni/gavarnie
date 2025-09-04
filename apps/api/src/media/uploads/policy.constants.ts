@@ -1,0 +1,8 @@
+// 일일 최대 업로드 회수
+export const BASIC_GRADE_UPLOAD_MAX_PER_DAY = 10;
+export const PLUS_GRADE_UPLOAD_MAX_PER_DAY = 30;
+export const PREMIUM_GRADE_UPLOAD_MAX_PER_DAY = 100;
+// 업로드 당 최대 용량
+export const BASIC_GRADE_UPLOAD_VOLUME_PER_TIME = 10;
+export const PLUS_GRADE_UPLOAD_VOLUME_PER_TIME = 30;
+export const PREMIUM_GRADE_UPLOAD_VOLUME_PER_TIME = 100;

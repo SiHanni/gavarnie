@@ -109,12 +109,14 @@ export type Presign =
 export async function presignUpload(
   originalFilename: string,
   contentType?: string,
-  title?: string
+  title?: string,
+  fileSize?: number
 ) {
   return request<Presign>({
     url: '/uploads/presign',
     method: 'POST',
     data: { originalFilename, contentType, title },
+    headers: fileSize != null ? { 'x-file-size': String(fileSize) } : undefined,
   });
 }
 

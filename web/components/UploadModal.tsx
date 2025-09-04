@@ -6,11 +6,12 @@ import { useUploadModal } from '@/contexts/UploadModalContext';
 import { useAuthModal } from '@/contexts/AuthModalContext';
 import {
   getAccessToken,
-  presignUpload,
+  presignUpload, // (filename, contentType?, title?, fileSize?)
   completeUpload,
   getMediaStatus,
 } from '@/lib/http';
 import { filenameWithoutExt } from '@/lib/strings';
+import { loadUserProfile, UserGrade, coerceUserGrade } from '@/lib/user';
 
 // ===== 상태 타입 =====
 type Step =
@@ -24,6 +25,25 @@ type Step =
   | 'failed'
   | 'error';
 
+const ACCENT = '#5a319f';
+
+// 서버 상수와 일치하도록(표시용)
+const GRADE_LABEL: Record<UserGrade, string> = {
+  basic: 'Basic',
+  plus: 'Plus',
+  premium: 'Premium',
+};
+const GRADE_MAX_MB: Record<UserGrade, number> = {
+  basic: 10,
+  plus: 30,
+  premium: 100,
+};
+const GRADE_MAX_PER_DAY: Record<UserGrade, number> = {
+  basic: 10,
+  plus: 30,
+  premium: 100,
+};
+
 // ===== 환경 변수 (없으면 기본값) =====
 const WARMUP_MS =
   Number(process.env.NEXT_PUBLIC_UPLOAD_STATUS_WARMUP_MS) || 5000;
@@ -32,20 +52,26 @@ const INTERVAL_MS =
 const TIMEOUT_MS =
   Number(process.env.NEXT_PUBLIC_UPLOAD_STATUS_TIMEOUT_MS) || 120000;
 
-const ACCENT = '#5a319f';
 const TITLE_MAX = 200;
 
 export default function UploadModal() {
   const { isOpen, close } = useUploadModal();
   const { open: openLogin } = useAuthModal();
 
-  // ===== 훅은 항상 컴포넌트 최상단에서만 호출 (조건부 금지) =====
+  // ===== 내부 상태 =====
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState<string>('');
   const [step, setStep] = useState<Step>('idle');
   const [msg, setMsg] = useState<string>('');
   const [progress, setProgress] = useState<number>(0);
 
+  // 리치 에러 UI (등급/한도 강조용)
+  const [richError, setRichError] = useState<React.ReactNode | null>(null);
+
+  // 내 등급 (로컬 프로필에서 읽음)
+  const [myGrade, setMyGrade] = useState<UserGrade>('basic');
+
+  // 참조: 취소/정리용
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -55,7 +81,7 @@ export default function UploadModal() {
     return filenameWithoutExt(file.name).slice(0, TITLE_MAX);
   }, [file]);
 
-  // 모달 열릴 때마다 상태 초기화
+  // 모달 열릴 때마다 상태 초기화 + 등급 로드
   useEffect(() => {
     if (!isOpen) return;
     setFile(null);
@@ -63,8 +89,16 @@ export default function UploadModal() {
     setStep('idle');
     setMsg('');
     setProgress(0);
+    setRichError(null);
+
+    // 내 등급 로드(로컬 저장소 기반)
+    const me = typeof window !== 'undefined' ? loadUserProfile() : null;
+    setMyGrade(coerceUserGrade(me?.userGrade));
+
     return () => {
+      // 모달 닫힐 때 정리
       xhrRef.current?.abort();
+      xhrRef.current = null;
       if (pollTimer.current) clearTimeout(pollTimer.current);
       pollTimer.current = null;
     };
@@ -76,7 +110,6 @@ export default function UploadModal() {
     setTitle(prev => (prev.trim().length ? prev : defaultTitle));
   }, [file, defaultTitle]);
 
-  // 모달 비표시(닫힘) 시에는 렌더하지 않음 (위의 훅들은 항상 호출됨 → 안전)
   if (!isOpen) return null;
 
   // ===== 이벤트 핸들러 =====
@@ -99,16 +132,17 @@ export default function UploadModal() {
         return;
       }
 
-      // 1) presign
+      // 1) presign — 파일 크기를 4번째 인자로 전달(서버 UploadPolicyGuard가 선제 차단)
       setStep('presign');
       setMsg('업로드 준비 중…');
+      setRichError(null);
 
-      // ⚠️ 백엔드 DTO: { originalFilename, title?, contentType? }
       const trimmedTitle = title.trim();
       const p = await presignUpload(
         file.name,
         file.type || undefined,
-        trimmedTitle || undefined
+        trimmedTitle || undefined,
+        file.size // ← 중요: x-file-size 헤더로 전달됨
       );
 
       const url = (p as any).url ?? (p as any).uploadUrl;
@@ -116,17 +150,27 @@ export default function UploadModal() {
       const key: string = (p as any).key;
       const mediaId: string = (p as any).mediaId;
 
-      // 2) PUT 업로드 (XHR 진행률)
+      if (!url || !key || !mediaId) {
+        throw new Error('Presign 응답이 올바르지 않습니다.');
+      }
+
+      // 2) PUT 업로드 — XHR 진행률/취소 지원
       setStep('uploading');
       setMsg('파일 업로드 중…');
-      await putWithProgress(url, headers, file, pct => setProgress(pct));
+      await putWithProgress(
+        url,
+        headers,
+        file,
+        pct => setProgress(pct),
+        xhrRef
+      );
 
-      // 3) 완료 통지
+      // 3) 서버에 완료 통지
       setStep('completing');
       setMsg('서버에 업로드 완료 알림…');
       await completeUpload(mediaId, key, file.size);
 
-      // 4) 초기 대기 (워커가 잡 집어갈 시간)
+      // 4) 초기 대기 (워커가 잡을 집어갈 시간)
       setStep('waiting');
       setMsg('처리 대기 중… (곧 시작됩니다)');
       await delay(WARMUP_MS);
@@ -134,26 +178,73 @@ export default function UploadModal() {
       // 5) 상태 폴링 (일시 오류 내성 + 백오프)
       setStep('polling');
       setMsg('미디어 처리 중… 서버와 동기화되고 있어요.');
-      await pollStatus(mediaId, INTERVAL_MS, TIMEOUT_MS);
+      await pollStatus(mediaId, INTERVAL_MS, TIMEOUT_MS, pollTimer);
 
       setStep('done');
       setMsg('완료! 피드에서 확인할 수 있어요.');
       close();
     } catch (e: any) {
-      if (e?.__status === 'FAILED') {
+      // 서버 정책 위반 시 400/403/413 등 메시지 표시
+      const status: number | undefined =
+        e?.response?.status ?? e?.status ?? e?.code;
+      const serverMsg: string =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        '업로드 중 오류가 발생했습니다.';
+
+      // 용량 초과(413/PayloadTooLarge) 또는 메시지에 '한도','too large' 등 포함 시
+      const isFileTooLarge =
+        status === 413 || /한도|too\s*large|FILE_TOO_LARGE/i.test(serverMsg);
+
+      // 일일 업로드 한도 초과 (403 + 메시지 키워드)
+      const isDailyExceeded =
+        status === 403 &&
+        /일일\s*업로드\s*한도|max\s*per\s*day|한도를\s*초과/i.test(serverMsg);
+
+      if (isFileTooLarge) {
+        const label = GRADE_LABEL[myGrade];
+        const maxMB = GRADE_MAX_MB[myGrade];
+        setStep('error');
+        setMsg(''); // 리치 메시지로 대체
+        setRichError(
+          <span>
+            파일이 <b style={{ color: ACCENT }}>{label}</b> 등급 한도{' '}
+            <b style={{ color: ACCENT }}>{maxMB}MB</b> 를 초과했습니다.
+          </span>
+        );
+      } else if (isDailyExceeded) {
+        const label = GRADE_LABEL[myGrade];
+        const maxCnt = GRADE_MAX_PER_DAY[myGrade];
+        setStep('error');
+        setMsg('');
+        setRichError(
+          <span>
+            오늘은 <b style={{ color: ACCENT }}>{label}</b> 등급 일일 한도{' '}
+            <b style={{ color: ACCENT }}>{maxCnt}개</b>를 초과했습니다.
+          </span>
+        );
+      } else if (e?.__status === 'FAILED') {
         setStep('failed');
         setMsg('처리 실패. 파일을 다시 시도해 주세요.');
+        setRichError(null);
       } else {
         setStep('error');
-        setMsg(e?.message || '업로드 중 오류가 발생했습니다.');
+        setMsg(serverMsg);
+        setRichError(null);
       }
+    } finally {
+      // 업로드 종료 후 XHR 참조 정리
+      xhrRef.current = null;
     }
   };
 
   const cancelAll = () => {
     xhrRef.current?.abort();
+    xhrRef.current = null;
     if (pollTimer.current) clearTimeout(pollTimer.current);
     pollTimer.current = null;
+    setRichError(null);
     close();
   };
 
@@ -185,6 +276,14 @@ export default function UploadModal() {
         <h2 className='text-2xl font-bold'>
           <span style={{ color: ACCENT }}>Catarie</span> 업로드
         </h2>
+
+        {/* 안내: 등급/한도 표시(표시용) */}
+        <p className='mt-2 text-xs text-white/60'>
+          현재 등급: <b style={{ color: ACCENT }}>{GRADE_LABEL[myGrade]}</b> ·
+          용량 제한(업로드 당):{' '}
+          <b style={{ color: ACCENT }}>{GRADE_MAX_MB[myGrade]}MB</b> · 일일
+          한도: <b style={{ color: ACCENT }}>{GRADE_MAX_PER_DAY[myGrade]}개</b>
+        </p>
 
         {/* 제목 입력 (옵션) */}
         <div className='mt-4'>
@@ -248,7 +347,7 @@ export default function UploadModal() {
               <div className='text-sm text-white/90 break-all'>
                 선택됨: {file.name}{' '}
                 <span className='text-white/50'>
-                  ({Math.round(file.size / 1024)} KB, {file.type || 'unknown'})
+                  ({fmtBytes(file.size)}, {file.type || 'unknown'})
                 </span>
               </div>
 
@@ -299,11 +398,13 @@ export default function UploadModal() {
           >
             닫기
           </button>
-          <div className='text-sm text-white/75 ml-auto'>{msg}</div>
+          <div className='text-sm text-white/75 ml-auto'>
+            {richError ? richError : msg}
+          </div>
         </div>
 
         {(step === 'waiting' || step === 'polling') && (
-          <p className='mt-3 text-xs text-white/55'>
+          <p className='mt-3 text-xs text白/55'>
             업로드 직후에는 작업 큐로 전달/준비되는 동안 잠시 대기할 수 있어요.
           </p>
         )}
@@ -330,18 +431,38 @@ function delay(ms: number) {
   return new Promise<void>(res => setTimeout(res, ms));
 }
 
-// XHR PUT 진행률 트래킹
+function fmtBytes(n: number) {
+  if (n < 1024) return `${n} B`;
+  const kb = n / 1024;
+  if (kb < 1024) return `${Math.round(kb)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  const gb = mb / 1024;
+  return `${gb.toFixed(2)} GB`;
+}
+
+// XHR PUT 진행률 + 취소 지원 (xhrRef에 인스턴스 보관)
 function putWithProgress(
   url: string,
   headers: Record<string, string>,
   file: File,
-  onProgress: (pct: number) => void
+  onProgress: (pct: number) => void,
+  xhrRef: React.MutableRefObject<XMLHttpRequest | null>
 ) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
+
     xhr.open('PUT', url, true);
-    for (const [k, v] of Object.entries(headers))
+    // Content-Type 없으면 S3에서 거부될 수 있음
+    xhr.setRequestHeader(
+      'Content-Type',
+      file.type || 'application/octet-stream'
+    );
+    for (const [k, v] of Object.entries(headers)) {
+      if (k.toLowerCase() === 'content-length') continue; // 브라우저가 설정 못함
       xhr.setRequestHeader(k, v as string);
+    }
 
     xhr.upload.onprogress = e => {
       if (!e.lengthComputable) return;
@@ -349,7 +470,7 @@ function putWithProgress(
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error(`PUT 실패: ${xhr.status}`));
+      else reject(new Error(`S3 PUT 실패: ${xhr.status}`));
     };
     xhr.onerror = () => reject(new Error('네트워크 오류'));
     xhr.onabort = () => reject(new Error('업로드 취소됨'));
@@ -362,7 +483,8 @@ function putWithProgress(
 async function pollStatus(
   mediaId: string,
   intervalMs: number,
-  timeoutMs: number
+  timeoutMs: number,
+  pollTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>
 ) {
   const start = Date.now();
   let wait = intervalMs;
@@ -389,7 +511,7 @@ async function pollStatus(
         status === 409 ||
         (typeof status === 'number' && status >= 500)
       ) {
-        // 그냥 아래 대기 후 다시 시도
+        // 아래 대기 후 재시도
       } else if (e?.__status === 'FAILED') {
         throw e; // 명시적 실패는 중단
       } else {
@@ -403,7 +525,10 @@ async function pollStatus(
       );
     }
 
-    await delay(wait);
+    await new Promise<void>(res => {
+      const t = setTimeout(() => res(), wait);
+      pollTimerRef.current = t;
+    });
     wait = Math.min(Math.round(wait * 1.5), MAX_WAIT);
   }
 }
