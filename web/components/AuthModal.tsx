@@ -122,7 +122,7 @@ export default function AuthModal() {
             <span className='text-sm text-white/80'>이메일</span>
             <input
               className='mt-1 w-full rounded-lg bg-neutral-900/80 border border-neutral-700/70
-                         px-3 py-2 outline-none
+                         px-3 py-2 outline-none text-white caret-white
                          focus:ring-2 focus:ring-[#5a319f] focus:border-[#5a319f]
                          placeholder:text-white/40'
               type='email'
@@ -141,7 +141,7 @@ export default function AuthModal() {
             <div className='relative'>
               <input
                 className='mt-1 w-full rounded-lg bg-neutral-900/80 border border-neutral-700/70
-                           px-3 py-2 pr-10 outline-none
+                           px-3 py-2 pr-10 outline-none text-white caret-white
                            focus:ring-2 focus:ring-[#5a319f] focus:border-[#5a319f]
                            placeholder:text-white/40'
                 type={showPw ? 'text' : 'password'}
@@ -171,7 +171,7 @@ export default function AuthModal() {
               <span className='text-sm text-white/80'>표시 이름</span>
               <input
                 className='mt-1 w-full rounded-lg bg-neutral-900/80 border border-neutral-700/70
-                           px-3 py-2 outline-none
+                           px-3 py-2 outline-none text-white caret-white
                            focus:ring-2 focus:ring-[#5a319f] focus:border-[#5a319f]
                            placeholder:text-white/40'
                 required
