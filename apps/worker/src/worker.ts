@@ -10,16 +10,10 @@ import {
   MediaReaction,
   Comment,
 } from '@gavarnie/entities';
+import { MEDIA_CORE_STATUS, MEDIA_STATUS } from './media.constants';
 
 type JobData = { mediaId: string; srcKey: string; contentType?: string };
 const QUEUE_NAME = 'transcode';
-
-function isAudio(ct?: string) {
-  return !!ct && ct.startsWith('audio/');
-}
-function isVideo(ct?: string) {
-  return !!ct && ct.startsWith('video/');
-}
 
 async function createDataSource() {
   const ds = new DataSource({
@@ -44,7 +38,9 @@ async function createDataSource() {
 async function main() {
   // 1) TypeORM DataSource / Repository
   const dataSource = await createDataSource();
-  const mediaRepo: Repository<Media> = dataSource.getRepository(Media);
+  const mediaRepository: Repository<Media> = dataSource.getRepository(Media);
+  const mediaCoreRepository: Repository<MediaCore> =
+    dataSource.getRepository(MediaCore);
 
   // 2) Redis (BullMQ)
   const connection = new IORedis(process.env.REDIS_URL!, {
@@ -59,27 +55,27 @@ async function main() {
       const { mediaId, srcKey, contentType } = job.data;
 
       // (a) 레코드 조회/검증
-      const media = await mediaRepo.findOne({ where: { id: mediaId } });
+      const media = await mediaRepository.findOne({ where: { id: mediaId } });
       if (!media) throw new Error('media not found');
       if (media.srcKey !== srcKey) throw new Error('srcKey mismatch');
 
       // 멱등: 이미 완료면 스킵
-      if (media.status === 'READY' && media.hlsKey) {
+      if (media.status === MEDIA_STATUS.READY && media.hlsKey) {
         console.log(
           `[worker] skip READY mediaId=${mediaId} hlsKey=${media.hlsKey}`,
         );
         return {
           ok: true,
           skipped: true,
-          status: 'READY',
+          status: MEDIA_STATUS.READY,
           hlsKey: media.hlsKey,
         };
       }
 
       // (b) PROCESSING 전이
-      media.status = 'PROCESSING' as any;
+      media.status = MEDIA_STATUS.PROCESSING;
       media.error = null as any;
-      await mediaRepo.save(media);
+      await mediaRepository.save(media);
       console.log(
         `[worker] PROCESSING mediaId=${mediaId} ct=${contentType ?? media.contentType}`,
       );
@@ -93,17 +89,35 @@ async function main() {
         );
 
         // (d) READY 전이 + hlsKey 기록
-        media.status = 'READY' as any;
+        media.status = MEDIA_STATUS.READY;
         media.hlsKey = hlsKey;
-        await mediaRepo.save(media);
+        await mediaRepository.save(media);
+
+        // core update
+        const mediaCore = await mediaCoreRepository.findOne({
+          where: { mediaId },
+        });
+        if (mediaCore) {
+          mediaCore.status = MEDIA_CORE_STATUS.PUBLISHED;
+          if (!mediaCore.publishedAt) mediaCore.publishedAt = new Date();
+          await mediaCoreRepository.save(mediaCore);
+        }
 
         console.log(`[worker] READY mediaId=${mediaId} hlsKey=${hlsKey}`);
-        return { ok: true, status: 'READY', hlsKey };
+        return { ok: true, status: MEDIA_STATUS.READY, hlsKey };
       } catch (e: any) {
         const msg = e?.message || String(e);
-        media.status = 'FAILED' as any;
+        media.status = MEDIA_STATUS.FAILED as any;
         media.error = msg;
-        await mediaRepo.save(media);
+        await mediaRepository.save(media);
+
+        const mediaCore = await mediaCoreRepository.findOne({
+          where: { mediaId },
+        });
+        if (mediaCore) {
+          mediaCore.status = MEDIA_CORE_STATUS.REJECTED;
+          await mediaCoreRepository.save(mediaCore);
+        }
 
         console.error(`[worker] FAILED mediaId=${mediaId} error=${msg}`);
 

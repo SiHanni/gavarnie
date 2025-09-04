@@ -15,4 +15,4 @@ export const MEDIA_CORE_STATUS = {
   REJECTED: 'rejected',
 } as const;
 
-// TODO: worker 쪽에 동일한게 있음. 합쳐야함
+// TODO: api 쪽에 동일한게 있음. 합쳐야함
