@@ -15,6 +15,7 @@ import { useShareModal } from '@/contexts/ShareModalContext';
 import ProgressBar from '@/components/ProgressBar';
 import { useCommentsPanel } from '@/contexts/CommentsPanelContext';
 import { useRouter } from 'next/navigation';
+import FollowButton from './FollowButton';
 
 function isAudio(node: RecentMediaNode) {
   return node.contentType?.startsWith('audio/');
@@ -279,8 +280,10 @@ export default function FeedSnapItem({
                 title={`${node.author.displayName}의 프로필로 이동`}
               >
                 <Avatar src={node.author.avatarUrl} size={AVATAR_SIZE} />
-                <div className='text-sm font-semibold'>
+                <div className='text-sm font-semibold flex items-center gap-2'>
                   {node.author.displayName}
+                  {/* ⬇️ 작고 심플한 구독 버튼 */}
+                  <FollowButton targetUserId={node.author.id} size='sm' />
                 </div>
               </div>
               <p className='mt-2 text-[13px] text-white/90 line-clamp-2 pointer-events-auto'>
