@@ -10,6 +10,7 @@ type Props = {
   color?: string; // 기본 #5a319f
   barHeight?: number; // 기본 8(px)
   className?: string; // 외부 여백/정렬
+  showHandle?: boolean;
 };
 
 function fmt(sec = 0) {
@@ -28,8 +29,9 @@ export default function ProgressBar({
   onSeek,
   duration = 0,
   color = '#5a319f',
-  barHeight = 8,
+  barHeight = 6,
   className = '',
+  showHandle = false,
 }: Props) {
   const barRef = useRef<HTMLDivElement | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -142,18 +144,20 @@ export default function ProgressBar({
           style={{ width: pct, height: '100%', backgroundColor: color }}
         />
         {/* handle */}
-        <div
-          className='absolute rounded-full'
-          style={{
-            left: pct,
-            top: '50%',
-            width: barHeight + 6,
-            height: barHeight + 6,
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: '#fff',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.5)',
-          }}
-        />
+        {showHandle && (
+          <div
+            className='absolute rounded-full'
+            style={{
+              left: pct,
+              top: '50%',
+              width: barHeight + 3,
+              height: barHeight + 3,
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: '#fff',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.5)',
+            }}
+          />
+        )}
 
         {/* 툴팁 */}
         {tooltipRatio != null && (
