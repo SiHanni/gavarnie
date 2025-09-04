@@ -11,12 +11,14 @@ import {
   MediaCore,
   MediaReaction,
   User,
+  UserFollows,
 } from '@gavarnie/entities';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { MediaReactionModule } from './media-reaction/media-reaction.module';
 import { CommentsModule } from './comments/comments.module';
 import { CommentReactionsModule } from './comments-reactions/comment-reactions.module';
+import { UserFollowsModule } from './user-follows/follow.module';
 
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { CommentReactionsModule } from './comments-reactions/comment-reactions.m
           Comment,
           CommentReaction,
           User,
+          UserFollows,
         ],
         autoLoadEntities: false,
         synchronize: false,
@@ -53,6 +56,7 @@ import { CommentReactionsModule } from './comments-reactions/comment-reactions.m
     MediaReactionModule,
     CommentsModule,
     CommentReactionsModule,
+    UserFollowsModule,
   ],
 })
 export class AppModule {}
