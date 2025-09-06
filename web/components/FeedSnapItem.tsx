@@ -274,18 +274,30 @@ export default function FeedSnapItem({
             {/* 하단 프로필/제목 */}
             <div className='absolute left-0 right-0 bottom-0 p-4 bg-gradient-to-t from-black/40 to-transparent z-10 pointer-events-none'>
               <div
-                className='flex items-center pointer-events-auto cursor-pointer'
+                className='flex items-center pointer-events-auto'
                 style={{ gap: NAME_GAP }}
-                onClick={() => router.push(`/users/${node.author.id}`)}
-                title={`${node.author.displayName}의 프로필로 이동`}
               >
-                <Avatar src={node.author.avatarUrl} size={AVATAR_SIZE} />
+                {/* ✅ 아바타만 프로필로 이동 */}
+                <button
+                  type='button'
+                  onClick={e => {
+                    e.stopPropagation();
+                    router.push(`/users/${node.author.id}`);
+                  }}
+                  aria-label={`${node.author.displayName}의 프로필로 이동`}
+                  className='rounded-full focus:outline-none focus:ring-2 focus:ring-white/30'
+                  title={`${node.author.displayName}의 프로필로 이동`}
+                >
+                  <Avatar src={node.author.avatarUrl} size={AVATAR_SIZE} />
+                </button>
+
+                {/* 이름 + 구독 버튼 (여긴 네비게이션 없음) */}
                 <div className='text-sm font-semibold flex items-center gap-2'>
                   {node.author.displayName}
-                  {/* ⬇️ 작고 심플한 구독 버튼 */}
                   <FollowButton targetUserId={node.author.id} size='sm' />
                 </div>
               </div>
+
               <p className='mt-2 text-[13px] text-white/90 line-clamp-2 pointer-events-auto'>
                 {node.title}
               </p>
@@ -312,6 +324,7 @@ export default function FeedSnapItem({
               commentIconSize={40}
               shareIconSize={40}
               buttonBgAlpha={0.18}
+              onAvatarClick={() => router.push(`/users/${node.author.id}`)}
               onLike={toggle}
               onComment={() => openComments({ mediaId: node.id })}
               onShare={() => {
