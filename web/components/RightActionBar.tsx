@@ -2,29 +2,31 @@
 
 import Image from 'next/image';
 import clsx from 'clsx';
+import React from 'react';
 
 type Props = {
   avatarUrl?: string;
   likeCount?: number;
   commentCount?: number;
-  stageHeight: number; // 세로 가운데 정렬용(부모 flex와 함께 사용)
-  offsetY?: number; // 필요한 경우만 사용(기본 120)
+  stageHeight: number;
+  offsetY?: number;
 
-  // 원형 버튼 지름
+  // 버튼 지름
   avatarButtonSize?: number;
   likeButtonSize?: number;
   commentButtonSize?: number;
   shareButtonSize?: number;
 
-  // 내부 아이콘 크기
+  // 아이콘 크기
   avatarIconSize?: number;
   likeIconSize?: number;
   commentIconSize?: number;
   shareIconSize?: number;
 
-  // 원 배경 투명도(0~1)
   buttonBgAlpha?: number;
 
+  // 콜백들
+  onAvatarClick?: () => void; // ⬅️ 추가
   onLike?: () => void;
   onComment?: () => void;
   onShare?: () => void;
@@ -49,12 +51,11 @@ export default function RightActionBar({
 
   buttonBgAlpha = 0.18,
 
+  onAvatarClick,
   onLike,
   onComment,
   onShare,
 }: Props) {
-  // ✅ 댓글 패널보다 항상 아래로만 깔리게 낮은 z-index 고정
-  //    (패널은 z-[1000] 을 사용 중)
   const wrapCls = clsx('relative z-30 flex flex-col items-center gap-4');
 
   const circle = (size: number) => ({
@@ -69,14 +70,17 @@ export default function RightActionBar({
       className={wrapCls + ' absolute top-1/2 left-0'}
       style={{ transform: `translateY(calc(-50% + ${offsetY}px))` }}
     >
-      {/* 작성자 */}
+      {/* 작성자 아바타 */}
       <RailItem
         buttonSize={avatarButtonSize}
         iconSize={avatarIconSize}
         circle={circle}
+        onClick={e => {
+          e?.stopPropagation?.(); // ⬅️ 비디오 클릭으로 전파 방지
+          onAvatarClick?.();
+        }}
         icon={
           avatarUrl ? (
-            // 아바타는 어떤 도메인도 허용되도록 <img> 사용
             <img
               src={avatarUrl}
               alt='author'
@@ -99,7 +103,10 @@ export default function RightActionBar({
         iconSize={likeIconSize}
         circle={circle}
         count={likeCount}
-        onClick={onLike}
+        onClick={e => {
+          e?.stopPropagation?.();
+          onLike?.();
+        }}
         icon={
           <Image
             src='/images/like.png'
@@ -117,7 +124,10 @@ export default function RightActionBar({
         iconSize={commentIconSize}
         circle={circle}
         count={commentCount}
-        onClick={onComment}
+        onClick={e => {
+          e?.stopPropagation?.();
+          onComment?.();
+        }}
         icon={
           <Image
             src='/images/comment_list.png'
@@ -134,7 +144,10 @@ export default function RightActionBar({
         buttonSize={shareButtonSize}
         iconSize={shareIconSize}
         circle={circle}
-        onClick={onShare}
+        onClick={e => {
+          e?.stopPropagation?.();
+          onShare?.();
+        }}
         icon={
           <Image
             src='/images/shareV1.png'
@@ -161,21 +174,20 @@ function RailItem({
   iconSize: number;
   circle: (n: number) => React.CSSProperties;
   count?: number;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
   icon: React.ReactNode;
 }) {
   return (
     <div className='flex flex-col items-center'>
-      {/* ✅ 아이콘은 원 안 '정중앙' */}
       <button
         type='button'
         onClick={onClick}
         className='grid place-items-center text-white'
         style={circle(buttonSize)}
+        aria-label='action'
       >
         {icon}
       </button>
-      {/* ✅ 카운트는 원 '바깥 아래' — 위로 밀리는 현상 제거 */}
       {typeof count === 'number' && (
         <span className='mt-1 text-xs text-white/80'>{formatCount(count)}</span>
       )}
