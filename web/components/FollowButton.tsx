@@ -29,7 +29,7 @@ export default function FollowButton({
   const label = isFollowing ? '구독 중' : '구독';
 
   const sizeCls: Record<Size, string> = {
-    sm: 'h-7 px-3 text-[12px]',
+    sm: 'h-7 px-3 text-[11px]',
     md: 'h-9 px-3.5 text-[13px]',
     lg: 'h-11 px-4 text-[14px]',
   };

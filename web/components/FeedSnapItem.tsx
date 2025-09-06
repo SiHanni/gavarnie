@@ -52,6 +52,27 @@ export default function FeedSnapItem({
   const [muted, setMuted] = useState(true);
   const [volume, setVolume] = useState(0.7);
 
+  // === 볼륨 패널 상태 (호버 유지 + 짧은 딜레이 닫힘) ===
+  const [volOpen, setVolOpen] = useState(false);
+  const volTimerRef = useRef<number | null>(null);
+  const volOpenNow = !muted && volOpen;
+  const openVol = () => {
+    if (volTimerRef.current) window.clearTimeout(volTimerRef.current);
+    setVolOpen(true);
+  };
+  const closeVolDelayed = () => {
+    if (volTimerRef.current) window.clearTimeout(volTimerRef.current);
+    volTimerRef.current = window.setTimeout(() => setVolOpen(false), 160);
+  };
+  useEffect(() => {
+    return () => {
+      if (volTimerRef.current) window.clearTimeout(volTimerRef.current);
+    };
+  }, []);
+  useEffect(() => {
+    if (muted) setVolOpen(false);
+  }, [muted]); // 음소거되면 패널 닫기
+
   // 진행바
   const [curr, setCurr] = useState(0);
   const [dur, setDur] = useState(0);
@@ -148,7 +169,6 @@ export default function FeedSnapItem({
     if (audioKind && muted) setMuted(false);
     togglePlay();
   };
-
   const onSeek = (ratio: number) => {
     const m = audioKind ? audioRef.current : videoRef.current;
     if (!m || !Number.isFinite(dur) || dur <= 0) return;
@@ -187,7 +207,6 @@ export default function FeedSnapItem({
                 <div
                   className='w-[min(88%,520px)] aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-neutral-700 to-neutral-900 border border-neutral-700'
                   style={{ touchAction: 'manipulation' }}
-                  onPointerDown={() => {}}
                   onPointerUp={e => {
                     e.stopPropagation();
                     onMediaToggle();
@@ -211,53 +230,96 @@ export default function FeedSnapItem({
             </div>
 
             {/* 좌상단 컨트롤 */}
-            <div className='absolute top-3 left-3 flex items-center gap-2 z-30 pointer-events-none'>
-              <button
-                onPointerUp={e => {
-                  e.stopPropagation();
-                  togglePlay();
-                }}
-                className='grid place-items-center p-1 pointer-events-auto'
-                aria-label={playing ? '일시정지' : '재생'}
-              >
-                <Image
-                  src={playing ? '/images/pause.png' : '/images/play.png'}
-                  alt=''
-                  width={28}
-                  height={28}
-                  className='w-7 h-7'
-                  draggable={false}
-                />
-              </button>
-
-              <div className='relative group pointer-events-none'>
+            <div className='absolute top-3 left-3 z-30 pointer-events-none'>
+              <div className='flex items-center gap-2 pointer-events-auto'>
+                {/* 재생/일시정지 */}
                 <button
                   onPointerUp={e => {
                     e.stopPropagation();
-                    toggleMute();
+                    togglePlay();
                   }}
-                  className='grid place-items-center p-1 pointer-events-auto'
-                  aria-label={muted ? '음소거 해제' : '음소거'}
+                  className='grid place-items-center p-1'
+                  aria-label={playing ? '일시정지' : '재생'}
                 >
                   <Image
-                    src={muted ? '/images/mute.png' : '/images/speaker.png'}
+                    src={playing ? '/images/pause.png' : '/images/play.png'}
                     alt=''
                     width={28}
                     height={28}
-                    className='w-8 h-9'
+                    className='w-7 h-7'
                     draggable={false}
                   />
                 </button>
+
+                {/* 스피커 + 볼륨 */}
+                <div
+                  className='relative group pointer-events-auto'
+                  onMouseEnter={openVol}
+                  onMouseLeave={closeVolDelayed}
+                >
+                  <button
+                    onPointerUp={e => {
+                      e.stopPropagation();
+                      toggleMute();
+                    }}
+                    className='grid place-items-center p-1'
+                    aria-label={muted ? '음소거 해제' : '음소거'}
+                  >
+                    <Image
+                      src={muted ? '/images/mute.png' : '/images/speaker.png'}
+                      alt=''
+                      width={28}
+                      height={28}
+                      className='w-8 h-9'
+                      draggable={false}
+                    />
+                  </button>
+
+                  {/* 브리지: 스피커→슬라이더 이동 중 hover 끊김 방지 */}
+                  <div
+                    className='absolute left-full top-0 w-3 h-full'
+                    onMouseEnter={openVol}
+                    onMouseLeave={closeVolDelayed}
+                    aria-hidden
+                  />
+
+                  {/* 볼륨 pill — 스피커 오른쪽 */}
+                  <div
+                    className={`absolute left-full top-1/2 -translate-y-1/2 ml-2 ${volOpenNow ? 'flex' : 'hidden'}`}
+                    style={{ zIndex: 40 }}
+                    onMouseEnter={openVol}
+                    onMouseLeave={closeVolDelayed}
+                    onPointerDown={e => e.stopPropagation()}
+                    onPointerUp={e => e.stopPropagation()}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div className='flex items-center gap-3 px-4 py-2 rounded-full bg-black/60 backdrop-blur-sm border border-white/10'>
+                      <input
+                        type='range'
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={volume}
+                        aria-label='볼륨'
+                        onChange={e =>
+                          setVolume(parseFloat(e.currentTarget.value))
+                        }
+                        className='w-[160px] accent-[#5a319f]'
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* 하단 프로필/제목 */}
-            <div className='absolute left-0 right-0 bottom-0 p-4 bg-gradient-to-t from-black/40 to-transparent z-10 pointer-events-none'>
+            {/* z-10 → z-50 로 상단 레이어보다 위에 */}
+            <div className='absolute left-0 right-0 bottom-0 p-4 bg-gradient-to-t from-black/40 to-transparent z-50 pointer-events-none'>
+              {/* 공간이 좁을 때 줄바꿈 허용 */}
               <div
-                className='flex items-center pointer-events-auto'
+                className='flex items-center flex-wrap pointer-events-auto'
                 style={{ gap: NAME_GAP }}
               >
-                {/* 아바타만 프로필 이동 */}
                 <button
                   type='button'
                   onClick={e => {
@@ -268,16 +330,20 @@ export default function FeedSnapItem({
                   className='rounded-full focus:outline-none focus:ring-2 focus:ring-white/30'
                   title={`${node.author.displayName}의 프로필로 이동`}
                 >
-                  <Avatar src={node.author.avatarUrl} size={AVATAR_SIZE} />
+                  <Avatar
+                    src={node.author.avatarUrl}
+                    size={overlayAvatarSize ?? Math.round(height * 0.04)}
+                  />
                 </button>
 
                 <div className='text-sm font-semibold flex items-center gap-2'>
                   {node.author.displayName}
+                  {/* ✅ 구독/구독중 버튼: 축소 방지 + z-index 보강 */}
                   <FollowButton
                     targetUserId={node.author.id}
                     size='sm'
                     variant='ghost'
-                    className='px-1.5 min-w-[55px]'
+                    className='relative z-50 px-1.5 min-w-[45px] shrink-0 inline-flex'
                   />
                 </div>
               </div>
