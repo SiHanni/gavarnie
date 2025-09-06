@@ -20,6 +20,18 @@ import FollowButton from './FollowButton';
 function isAudio(node: RecentMediaNode) {
   return node.contentType?.startsWith('audio/');
 }
+function useIsMobile(max = 560) {
+  const [m, setM] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia(`(max-width:${max}px)`);
+    const sync = () => setM(mq.matches);
+    sync();
+    mq.addEventListener?.('change', sync);
+    return () => mq.removeEventListener?.('change', sync);
+  }, [max]);
+  return m;
+}
 
 export default function FeedSnapItem({
   node,
@@ -30,6 +42,9 @@ export default function FeedSnapItem({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+
+  const isMobile = useIsMobile();
+  const BOTTOM_BAR_H = 68; // 프로젝트 하단 탭 높이
 
   const streamUrl = useMemo(() => joinHls(node.hlsKey), [node.hlsKey]);
   const audioKind = isAudio(node);
@@ -52,7 +67,7 @@ export default function FeedSnapItem({
   const [muted, setMuted] = useState(true);
   const [volume, setVolume] = useState(0.7);
 
-  // === 볼륨 패널 상태 (호버 유지 + 짧은 딜레이 닫힘) ===
+  // 볼륨 패널
   const [volOpen, setVolOpen] = useState(false);
   const volTimerRef = useRef<number | null>(null);
   const volOpenNow = !muted && volOpen;
@@ -71,9 +86,9 @@ export default function FeedSnapItem({
   }, []);
   useEffect(() => {
     if (muted) setVolOpen(false);
-  }, [muted]); // 음소거되면 패널 닫기
+  }, [muted]);
 
-  // 진행바
+  // 진행값
   const [curr, setCurr] = useState(0);
   const [dur, setDur] = useState(0);
   const [buf, setBuf] = useState(0);
@@ -184,6 +199,14 @@ export default function FeedSnapItem({
     <section
       ref={rootRef}
       className='snap-start h-[100svh] bg-black text-white relative overflow-hidden'
+      // 하단 탭/안전영역 만큼 여유
+      style={
+        isMobile
+          ? {
+              paddingBottom: `calc(env(safe-area-inset-bottom) + ${BOTTOM_BAR_H}px)`,
+            }
+          : undefined
+      }
     >
       <div className='h-full w-full grid place-items-center'>
         <div className='flex items-center gap-5'>
@@ -216,8 +239,8 @@ export default function FeedSnapItem({
               </div>
             )}
 
-            {/* 진행바 */}
-            <div className='absolute inset-x-0 bottom-0 z-20'>
+            {/* 진행바 (프레임 최상단 레이어 바로 아래) */}
+            <div className='absolute inset-x-0 bottom-0 z-40'>
               <ProgressBar
                 className='px-3'
                 barHeight={6}
@@ -230,9 +253,8 @@ export default function FeedSnapItem({
             </div>
 
             {/* 좌상단 컨트롤 */}
-            <div className='absolute top-3 left-3 z-30 pointer-events-none'>
+            <div className='absolute top-3 left-3 z-50 pointer-events-none'>
               <div className='flex items-center gap-2 pointer-events-auto'>
-                {/* 재생/일시정지 */}
                 <button
                   onPointerUp={e => {
                     e.stopPropagation();
@@ -251,7 +273,7 @@ export default function FeedSnapItem({
                   />
                 </button>
 
-                {/* 스피커 + 볼륨 */}
+                {/* 볼륨 */}
                 <div
                   className='relative group pointer-events-auto'
                   onMouseEnter={openVol}
@@ -275,18 +297,15 @@ export default function FeedSnapItem({
                     />
                   </button>
 
-                  {/* 브리지: 스피커→슬라이더 이동 중 hover 끊김 방지 */}
                   <div
                     className='absolute left-full top-0 w-3 h-full'
                     onMouseEnter={openVol}
                     onMouseLeave={closeVolDelayed}
                     aria-hidden
                   />
-
-                  {/* 볼륨 pill — 스피커 오른쪽 */}
                   <div
                     className={`absolute left-full top-1/2 -translate-y-1/2 ml-2 ${volOpenNow ? 'flex' : 'hidden'}`}
-                    style={{ zIndex: 40 }}
+                    style={{ zIndex: 70 }}
                     onMouseEnter={openVol}
                     onMouseLeave={closeVolDelayed}
                     onPointerDown={e => e.stopPropagation()}
@@ -313,9 +332,7 @@ export default function FeedSnapItem({
             </div>
 
             {/* 하단 프로필/제목 */}
-            {/* z-10 → z-50 로 상단 레이어보다 위에 */}
             <div className='absolute left-0 right-0 bottom-0 p-4 bg-gradient-to-t from-black/40 to-transparent z-50 pointer-events-none'>
-              {/* 공간이 좁을 때 줄바꿈 허용 */}
               <div
                 className='flex items-center flex-wrap pointer-events-auto'
                 style={{ gap: NAME_GAP }}
@@ -338,7 +355,6 @@ export default function FeedSnapItem({
 
                 <div className='text-sm font-semibold flex items-center gap-2'>
                   {node.author.displayName}
-                  {/* ✅ 구독/구독중 버튼: 축소 방지 + z-index 보강 */}
                   <FollowButton
                     targetUserId={node.author.id}
                     size='sm'
@@ -352,40 +368,73 @@ export default function FeedSnapItem({
                 {node.title}
               </p>
             </div>
+
+            {/* ★ 모바일: 프레임 내부 우측 레일(가장 마지막에, 가장 위 레이어) */}
+            {isMobile && (
+              <RightActionBar
+                variant='inside'
+                insideOffsetY={120} // 더 내려 배치하려면 값 키우기
+                insideRight={10}
+                avatarUrl={node.author.avatarUrl || undefined}
+                likeCount={count}
+                commentCount={node.commentCount}
+                avatarButtonSize={48}
+                likeButtonSize={42}
+                commentButtonSize={42}
+                shareButtonSize={42}
+                avatarIconSize={44}
+                likeIconSize={26}
+                commentIconSize={26}
+                shareIconSize={26}
+                buttonBgAlpha={0.18}
+                onAvatarClick={() => router.push(`/users/${node.author.id}`)}
+                onLike={toggle}
+                onComment={() => openComments({ mediaId: node.id })}
+                onShare={() => {
+                  const url =
+                    typeof window !== 'undefined'
+                      ? `${location.origin}/?m=${node.id}`
+                      : streamUrl;
+                  openShare({ url, title });
+                }}
+              />
+            )}
           </div>
 
-          {/* 우측 액션 레일 */}
-          <div
-            className='relative z-[100] pointer-events-auto'
-            style={{ height }}
-          >
-            <RightActionBar
-              avatarUrl={node.author.avatarUrl || undefined}
-              likeCount={count}
-              commentCount={node.commentCount}
-              stageHeight={height}
-              offsetY={160}
-              avatarButtonSize={60}
-              avatarIconSize={60}
-              likeButtonSize={50}
-              commentButtonSize={50}
-              shareButtonSize={50}
-              likeIconSize={33}
-              commentIconSize={40}
-              shareIconSize={40}
-              buttonBgAlpha={0.18}
-              onAvatarClick={() => router.push(`/users/${node.author.id}`)}
-              onLike={toggle}
-              onComment={() => openComments({ mediaId: node.id })}
-              onShare={() => {
-                const url =
-                  typeof window !== 'undefined'
-                    ? `${location.origin}/?m=${node.id}`
-                    : streamUrl;
-                openShare({ url, title });
-              }}
-            />
-          </div>
+          {/* 데스크탑: 프레임 오른쪽 바깥 레일 */}
+          {!isMobile && (
+            <div
+              className='relative z-[60] pointer-events-auto'
+              style={{ height }}
+            >
+              <RightActionBar
+                variant='outside'
+                avatarUrl={node.author.avatarUrl || undefined}
+                likeCount={count}
+                commentCount={node.commentCount}
+                offsetY={160}
+                avatarButtonSize={60}
+                avatarIconSize={60}
+                likeButtonSize={50}
+                commentButtonSize={50}
+                shareButtonSize={50}
+                likeIconSize={33}
+                commentIconSize={40}
+                shareIconSize={40}
+                buttonBgAlpha={0.18}
+                onAvatarClick={() => router.push(`/users/${node.author.id}`)}
+                onLike={toggle}
+                onComment={() => openComments({ mediaId: node.id })}
+                onShare={() => {
+                  const url =
+                    typeof window !== 'undefined'
+                      ? `${location.origin}/?m=${node.id}`
+                      : joinHls(node.hlsKey);
+                  openShare({ url, title });
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
     </section>

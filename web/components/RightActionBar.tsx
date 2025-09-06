@@ -2,13 +2,26 @@
 
 import Image from 'next/image';
 import clsx from 'clsx';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+
+function useIsMobile(max = 560) {
+  const [m, setM] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width:${max}px)`);
+    const sync = () => setM(mq.matches);
+    sync();
+    mq.addEventListener?.('change', sync);
+    return () => mq.removeEventListener?.('change', sync);
+  }, [max]);
+  return m;
+}
 
 type Props = {
   avatarUrl?: string;
   likeCount?: number;
   commentCount?: number;
-  stageHeight: number;
+
+  /** outside 모드에서 세로 오프셋(px) */
   offsetY?: number;
 
   // 버튼 지름
@@ -25,8 +38,18 @@ type Props = {
 
   buttonBgAlpha?: number;
 
-  // 콜백들
-  onAvatarClick?: () => void; // ⬅️ 추가
+  /** outside: 프레임 바깥 오른쪽 / inside: 프레임 안쪽 우측(모바일) */
+  variant?: 'outside' | 'inside';
+
+  /** inside 모드에서 세로 오프셋(+면 아래) */
+  insideOffsetY?: number;
+  /** inside 모드에서 우측 여백(px) */
+  insideRight?: number;
+
+  /** 이 픽셀 이하를 모바일로 간주(기본 560) */
+  mobileBreakpoint?: number;
+
+  onAvatarClick?: () => void;
   onLike?: () => void;
   onComment?: () => void;
   onShare?: () => void;
@@ -36,7 +59,7 @@ export default function RightActionBar({
   avatarUrl,
   likeCount = 0,
   commentCount = 0,
-  stageHeight,
+
   offsetY = 120,
 
   avatarButtonSize = 56,
@@ -50,13 +73,38 @@ export default function RightActionBar({
   shareIconSize = 30,
 
   buttonBgAlpha = 0.18,
+  variant = 'outside',
+
+  insideOffsetY = 20,
+  insideRight = 10,
+
+  mobileBreakpoint = 560,
 
   onAvatarClick,
   onLike,
   onComment,
   onShare,
 }: Props) {
-  const wrapCls = clsx('relative z-30 flex flex-col items-center gap-4');
+  const isMobile = useIsMobile(mobileBreakpoint);
+
+  // z 값은 tailwind 기본(50)보다 높은 임의값 사용
+  const wrapBase =
+    'pointer-events-auto flex flex-col items-center gap-4 z-[70]';
+
+  const wrapPos =
+    variant === 'inside'
+      ? 'absolute right-2 top-1/2' // 프레임 내부
+      : 'absolute top-1/2 left-0'; // 프레임 외부 래퍼 안에서
+
+  const wrapCls = clsx(wrapBase, wrapPos);
+
+  const style: React.CSSProperties =
+    variant === 'inside'
+      ? {
+          right: insideRight,
+          transform: `translateY(calc(-50% + ${insideOffsetY}px))`,
+        }
+      : { transform: `translateY(calc(-50% + ${offsetY}px))` };
 
   const circle = (size: number) => ({
     width: size,
@@ -66,34 +114,33 @@ export default function RightActionBar({
   });
 
   return (
-    <div
-      className={wrapCls + ' absolute top-1/2 left-0'}
-      style={{ transform: `translateY(calc(-50% + ${offsetY}px))` }}
-    >
-      {/* 작성자 아바타 */}
-      <RailItem
-        buttonSize={avatarButtonSize}
-        iconSize={avatarIconSize}
-        circle={circle}
-        onClick={e => {
-          e?.stopPropagation?.(); // ⬅️ 비디오 클릭으로 전파 방지
-          onAvatarClick?.();
-        }}
-        icon={
-          avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt='author'
-              width={avatarButtonSize}
-              height={avatarButtonSize}
-              className='w-full h-full object-cover rounded-full'
-              referrerPolicy='no-referrer'
-            />
-          ) : (
-            <div className='grid place-items-center w-full h-full text-white/80 text-sm'></div>
-          )
-        }
-      />
+    <div className={wrapCls} style={style} aria-label='오른쪽 액션바'>
+      {/* 작성자 — 모바일에서는 숨김 */}
+      {!isMobile && (
+        <RailItem
+          buttonSize={avatarButtonSize}
+          iconSize={avatarIconSize}
+          circle={circle}
+          onClick={e => {
+            e?.stopPropagation?.();
+            onAvatarClick?.();
+          }}
+          icon={
+            avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt='author'
+                width={avatarButtonSize}
+                height={avatarButtonSize}
+                className='w-full h-full object-cover rounded-full'
+                referrerPolicy='no-referrer'
+              />
+            ) : (
+              <div className='grid place-items-center w-full h-full text-white/80 text-sm' />
+            )
+          }
+        />
+      )}
 
       {/* 좋아요 */}
       <RailItem

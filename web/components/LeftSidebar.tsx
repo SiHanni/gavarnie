@@ -32,9 +32,13 @@ type Props = {
   logoHeight?: number;
   paddingTop?: number;
   paddingLeft?: number;
+  compactAt?: number; // 축소 레일로
+  mobileAt?: number; // 바텀탭으로
 };
 
 const ICON_SIZE = 28;
+const COMPACT_WIDTH = 72;
+const COMPACT_ICON = 28;
 
 export default function LeftSidebar({
   width = 260,
@@ -43,11 +47,12 @@ export default function LeftSidebar({
   logoHeight = 80,
   paddingTop = 20,
   paddingLeft = 20,
+  compactAt = 1080,
+  mobileAt = 560, // iPhone Max 이하
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // 약관 페이지에선 사이드바 숨김
   if (pathname?.startsWith('/terms')) return null;
 
   const { open: openUpload } = useUploadModal();
@@ -60,6 +65,22 @@ export default function LeftSidebar({
   const [me, setMe] = useState<UserProfile | null>(
     typeof window !== 'undefined' ? loadUserProfile() : null
   );
+
+  // 창 크기에 따라 축소 여부
+  const [isCompact, setIsCompact] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const apply = () => {
+      if (typeof window === 'undefined') return;
+      const w = window.innerWidth;
+      setIsMobile(w <= mobileAt);
+      setIsCompact(w > mobileAt && w <= compactAt);
+    };
+    apply();
+    window.addEventListener('resize', apply);
+    return () => window.removeEventListener('resize', apply);
+  }, [compactAt, mobileAt]);
 
   useEffect(() => {
     setMounted(true);
@@ -91,6 +112,12 @@ export default function LeftSidebar({
     };
   }, [hasToken, me]);
 
+  // 사이드바 상태가 바뀔 때 콘텐츠에게 재측정 알림
+  useEffect(() => {
+    if (!mounted) return;
+    window.dispatchEvent(new CustomEvent('sidebar:changed'));
+  }, [mounted, isCompact]);
+
   const loggedIn = mounted && hasToken && !!getAccessToken() && !!me;
 
   const goHome = () => {
@@ -121,8 +148,37 @@ export default function LeftSidebar({
 
   if (!mounted) return null;
 
+  // ── Mobile: Bottom Tabbar ─────────────────────────────────
+  if (isMobile) {
+    return (
+      <BottomTabBar
+        activePathname={pathname}
+        onHome={goHome}
+        onUpload={doUpload}
+        onProfile={goProfile}
+      />
+    );
+  }
+
+  // ── Compact left rail ─────────────────────────────────────
+  if (isCompact) {
+    return (
+      <CompactRail
+        loggedIn={loggedIn}
+        onHome={goHome}
+        onUpload={doUpload}
+        onProfile={goProfile}
+        onLogin={() => openAuth('login')}
+        onLogout={doLogout}
+        activePathname={pathname}
+      />
+    );
+  }
+
+  // ── Full sidebar (desktop) ────────────────────────────────
   return (
     <aside
+      id='left-sidebar'
       className='fixed left-0 top-0 h-[100svh] z-[80] bg-black/60 backdrop-blur-sm text-white'
       style={{ width }}
       aria-label='왼쪽 내비게이션'
@@ -131,7 +187,6 @@ export default function LeftSidebar({
         className='flex flex-col h-full'
         style={{ paddingTop, paddingLeft, paddingRight: 12 }}
       >
-        {/* 배너 */}
         <button
           type='button'
           onClick={goHome}
@@ -156,7 +211,6 @@ export default function LeftSidebar({
           />
         </button>
 
-        {/* 메뉴 */}
         <nav className='mt-6 flex flex-col gap-2 text-[15px]'>
           <SideItem
             label='홈'
@@ -194,7 +248,6 @@ export default function LeftSidebar({
           )}
         </nav>
 
-        {/* 약관/정책 링크 */}
         <div className='mt-6 mx-3 border-t border-white/10' />
         <div className='px-3 pt-4 pb-2 text-[13px] text-white/60 space-y-2'>
           <div className='hover:text-white transition-colors'>
@@ -205,20 +258,16 @@ export default function LeftSidebar({
           </div>
         </div>
 
-        {/* 하단 프로필 카드 (전체가 버튼) */}
         {loggedIn && (
-          // ▼ 카드 위치를 아래로: mt-auto 추가 + 여백 살짝 키움
           <div className='mt-auto mb-40 mr-3'>
             <button
               type='button'
               onClick={goProfile}
               aria-label='내 프로필로 이동'
-              // ▼ 이름을 오른쪽으로: gap-4로 간격 확대
               className='w-full flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2
                          hover:bg-white/10 hover:border-white/20 transition-colors
                          focus:outline-none focus:ring-2 focus:ring-[#5a319f]/60'
             >
-              {/* 아바타 */}
               <div className='w-11 h-11 overflow-hidden rounded-full border border-white/20'>
                 {me!.avatarUrl ? (
                   <img
@@ -233,11 +282,8 @@ export default function LeftSidebar({
                   </div>
                 )}
               </div>
-
-              {/* 텍스트: 뱃지 ↑, 이름 ↓ */}
               <div className='min-w-0 text-left'>
                 {!!me?.userGrade && (
-                  // ▼ 뱃지 더 크게: 패딩/폰트 업
                   <span
                     className='inline-block px-3 py-1 rounded-full text-[12px] md:text-[13px] font-semibold border'
                     style={{
@@ -260,7 +306,6 @@ export default function LeftSidebar({
                     }
                   </span>
                 )}
-                {/* ▼ 이름을 한 칸 더 밀기: ml-2 + 글자 조금 키움 */}
                 <div
                   className='mt-1 ml-2 text-white/90 text-[15px] leading-tight break-words line-clamp-2'
                   title={me!.displayName || me!.email}
@@ -280,6 +325,148 @@ export default function LeftSidebar({
   );
 }
 
+/* ─── Compact rail ─── */
+function CompactRail({
+  loggedIn,
+  onHome,
+  onUpload,
+  onProfile,
+  onLogin,
+  onLogout,
+  activePathname,
+}: {
+  loggedIn: boolean;
+  onHome: () => void;
+  onUpload: () => void;
+  onProfile: () => void;
+  onLogin: () => void;
+  onLogout: () => void;
+  activePathname: string | null;
+}) {
+  return (
+    <aside
+      id='left-sidebar'
+      className='fixed left-0 top-0 h-[100svh] z-[80] bg-black/60 backdrop-blur-sm text-white'
+      style={{ width: COMPACT_WIDTH }}
+      aria-label='왼쪽 내비게이션(축소)'
+    >
+      <div className='h-full flex flex-col items-center py-4'>
+        <button
+          type='button'
+          onClick={onHome}
+          aria-label='홈으로 이동'
+          title='홈'
+          className='grid place-items-center w-12 h-12 rounded-xl hover:bg-white/10 transition-colors'
+        >
+          <img
+            src='/images/favicon.png'
+            alt='Catarie'
+            width={24}
+            height={24}
+            className='w-9 h-9'
+            draggable={false}
+            decoding='async'
+          />
+        </button>
+
+        <nav className='mt-2 flex flex-col items-center gap-2'>
+          <IconOnly
+            label='홈'
+            src='/images/Home.png'
+            active={activePathname === '/'}
+            onClick={onHome}
+          />
+          <IconOnly
+            label='업로드'
+            src='/images/shinewaterdrop.png'
+            onClick={onUpload}
+          />
+          <IconOnly
+            label='프로필'
+            src='/images/profile.png'
+            onClick={onProfile}
+          />
+          {!loggedIn ? (
+            <IconOnly
+              label='로그인'
+              src='/images/login.png'
+              onClick={onLogin}
+            />
+          ) : (
+            <IconOnly
+              label='로그아웃'
+              src='/images/logout.png'
+              onClick={onLogout}
+            />
+          )}
+        </nav>
+
+        <div className='mt-auto pb-3 text-[10px] text-white/45 select-none'>
+          © Catarie
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+/* ─── Mobile bottom tabbar ─── */
+function BottomTabBar({
+  activePathname,
+  onHome,
+  onUpload,
+  onProfile,
+}: {
+  activePathname: string | null;
+  onHome: () => void;
+  onUpload: () => void;
+  onProfile: () => void;
+}) {
+  return (
+    <nav
+      id='bottom-tabbar'
+      className='fixed bottom-0 inset-x-0 z-[90] bg-black/70 backdrop-blur-md border-t border-white/10'
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      aria-label='하단 내비게이션'
+    >
+      <ul className='mx-auto max-w-[680px] h-14 px-10 flex items-center justify-between'>
+        <Tab
+          icon='/images/mobile_home.png'
+          label=''
+          active={activePathname === '/'}
+          onClick={onHome}
+        />
+        <Tab icon='/images/mobile_upload.png' label='' onClick={onUpload} />
+        <Tab icon='/images/mobile_profile.png' label='' onClick={onProfile} />
+      </ul>
+    </nav>
+  );
+}
+function Tab({
+  icon,
+  label,
+  onClick,
+  active,
+}: {
+  icon: string;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1 px-3 py-1 rounded-md ${
+        active ? 'text-white' : 'text-white/80'
+      }`}
+    >
+      <img src={icon} alt='' className='w-6 h-6' />
+      <span className='text-[11px]'>{label}</span>
+    </button>
+  );
+}
+
+/* ─── Shared items ─── */
 function SideItem({
   label,
   iconSrc,
@@ -302,8 +489,7 @@ function SideItem({
           active
             ? 'bg-white/15 border-white/15'
             : 'hover:bg-white/10 hover:border-white/10 border-transparent'
-        }
-      `}
+        }`}
     >
       <span className='inline-flex items-center gap-3'>
         {iconSrc && (
@@ -319,6 +505,49 @@ function SideItem({
             loading='lazy'
           />
         )}
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function IconOnly({
+  label,
+  src,
+  onClick,
+  active = false,
+  size = COMPACT_ICON,
+}: {
+  label: string;
+  src: string;
+  onClick: () => void;
+  active?: boolean;
+  size?: number;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className={`group relative grid place-items-center w-12 h-12 rounded-xl transition-colors
+        ${active ? 'bg-white/15' : 'hover:bg-white/10'}`}
+    >
+      <img
+        src={src}
+        alt=''
+        width={size}
+        height={size}
+        className='w-7 h-7'
+        draggable={false}
+        decoding='async'
+        loading='lazy'
+      />
+      <span
+        className='pointer-events-none absolute left-[110%] top-1/2 -translate-y-1/2
+                   opacity-0 group-hover:opacity-100 transition-opacity text-[11px]
+                   px-2 py-1 rounded-md bg-white/10 border border-white/10 whitespace-nowrap'
+      >
         {label}
       </span>
     </button>
