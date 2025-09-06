@@ -90,9 +90,7 @@ export default function RightActionBar({
               referrerPolicy='no-referrer'
             />
           ) : (
-            <div className='grid place-items-center w-full h-full text-white/80 text-sm'>
-              ?
-            </div>
+            <div className='grid place-items-center w-full h-full text-white/80 text-sm'></div>
           )
         }
       />

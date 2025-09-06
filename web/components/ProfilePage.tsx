@@ -232,9 +232,8 @@ export default function ProfilePage({ userId }: { userId: string }) {
               : '영상이 아직 없습니다.'}
           </div>
         ) : (
-          <ul className='grid grid-cols-3 gap-[2px] md:gap-1'>
+          <ul className='grid grid-cols-4 gap-[2px] md:gap-1'>
             {items.map(n => {
-              // [ADDED] 대표 540 썸네일 절대경로 및 srcset 구성 (없으면 플레이스홀더)
               const v = (n as any).thumbnailVersion ?? 1;
               const hasThumb = !!(n as any).thumbnailKey;
               const src = hasThumb
@@ -270,7 +269,7 @@ export default function ProfilePage({ userId }: { userId: string }) {
                         }}
                       />
                     </div>
-                    <div className='px-2 py-1 text-[11px] line-clamp-2 text-left'>
+                    <div className='px-3 py-1 text-[14px] line-clamp-2 text-left'>
                       {n.title}
                     </div>
                   </button>
