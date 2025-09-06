@@ -65,6 +65,7 @@ export class AuthController {
       email: user.email,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl ?? null,
+      statusMessage: user.statusMessage ?? null,
     };
   }
 }

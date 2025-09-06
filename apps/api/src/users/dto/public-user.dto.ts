@@ -9,4 +9,7 @@ export class PublicUserDto {
 
   @ApiProperty({ nullable: true })
   avatarUrl!: string | null;
+
+  @ApiProperty({ nullable: true })
+  statusMessage!: string | null;
 }

@@ -1,56 +1,67 @@
 'use client';
 
 import React from 'react';
+import clsx from 'clsx';
 import { useFollow } from '@/hooks/useFollow';
 import { getAccessToken } from '@/lib/http';
 import { useAuthModal } from '@/contexts/AuthModalContext';
-import { loadUserProfile } from '@/lib/user';
 
-type Props = {
+type Size = 'sm' | 'md' | 'lg';
+type Variant = 'brand' | 'pill'; // pill=둥근사각, 구독중=보라색
+
+export default function FollowButton({
+  targetUserId,
+  size = 'md',
+  variant = 'pill',
+  className,
+}: {
   targetUserId: string;
-  size?: 'sm' | 'md';
-};
-
-export default function FollowButton({ targetUserId, size = 'sm' }: Props) {
+  size?: Size;
+  variant?: Variant;
+  className?: string;
+}) {
+  const { isFollowing, isLoading, toggle } = useFollow(targetUserId);
   const { open: openAuth } = useAuthModal();
-  const me = typeof window !== 'undefined' ? loadUserProfile() : null;
-  const isMe = me?.id && me.id === targetUserId;
 
-  // 내 버튼이면 숨김
-  if (isMe) return null;
-
-  const loggedIn = !!getAccessToken();
-  // 로그인 상태에서만 서버로 상태 조회 (로그아웃이면 요청 안 함)
-  const { isFollowing, isLoading, toggle } = useFollow(targetUserId, {
-    enabled: loggedIn,
-  });
-
-  const onClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // ★ 부모 클릭(프로필 이동) 막기
-    if (!loggedIn) {
-      openAuth('login'); // 로그인 모달만 열기
+  const onClick = () => {
+    if (!getAccessToken()) {
+      openAuth('login');
       return;
     }
-    toggle();
+    if (!isLoading) toggle();
   };
 
-  const padCls =
-    size === 'sm' ? 'px-2 py-[3px] text-[11px]' : 'px-3 py-[6px] text-[13px]';
+  // 크기 (둥근 사각형)
+  const sizes: Record<Size, string> = {
+    sm: 'h-8 px-3 text-[12px] rounded-xl',
+    md: 'h-9 px-4 text-sm rounded-xl',
+    lg: 'h-10 md:h-11 px-5 text-[15px] rounded-xl',
+  };
+
+  // 색상
+  const BRAND = '#5a319f';
+  const visual =
+    variant === 'pill'
+      ? // 구독중(보라) / 미구독(중립 그레이)
+        isFollowing
+        ? `bg-[${BRAND}] hover:brightness-110 text-white border border-transparent`
+        : 'bg-white/10 hover:bg-white/16 text-white border border-white/20'
+      : // 기본 보라 버튼
+        'bg-[${BRAND}] hover:brightness-110 text-white border border-transparent';
 
   return (
     <button
       type='button'
       disabled={isLoading}
       onClick={onClick}
-      className={`rounded-full font-semibold disabled:opacity-50 hover:bg-white/10 ${padCls}`}
-      style={{
-        border: '1px solid rgba(255,255,255,0.6)',
-        background: 'transparent',
-        color: '#fff', // ★ 구독/구독중 모두 하얀색
-      }}
-      aria-pressed={loggedIn && isFollowing ? true : false}
+      className={clsx(
+        'inline-flex items-center justify-center font-semibold transition-colors select-none',
+        sizes[size],
+        visual,
+        className
+      )}
     >
-      {loggedIn && isFollowing ? '구독중' : '구독'}
+      {isLoading ? '...' : isFollowing ? '구독중' : '구독'}
     </button>
   );
 }

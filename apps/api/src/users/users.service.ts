@@ -80,6 +80,7 @@ export class UsersService {
         'id',
         'email',
         'displayName',
+        'statusMessage',
         'userGrade',
         'avatarUrl',
         'createdAt',
@@ -105,6 +106,10 @@ export class UsersService {
     if (dto.avatarUrl !== undefined) {
       u.avatarUrl = dto.avatarUrl ? String(dto.avatarUrl).trim() : null;
     }
+    if (dto.statusMessage !== undefined) {
+      const v = dto.statusMessage?.trim() ?? '';
+      u.statusMessage = v.length > 0 ? v.slice(0, 50) : null;
+    }
 
     await this.userRepository.save(u);
 
@@ -113,6 +118,7 @@ export class UsersService {
       email: u.email,
       displayName: u.displayName,
       avatarUrl: u.avatarUrl ?? null,
+      statusMessage: u.statusMessage ?? null,
     };
   }
 
@@ -126,6 +132,7 @@ export class UsersService {
       id: String(user.id),
       displayName: user.displayName,
       avatarUrl: user.avatarUrl ?? null,
+      statusMessage: user.statusMessage,
     };
   }
 

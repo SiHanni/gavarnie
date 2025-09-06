@@ -25,6 +25,9 @@ export class User {
   @Column({ name: 'display_name', type: 'varchar', length: 100 })
   displayName!: string;
 
+  @Column({ name: 'status_message', type: 'varchar', length: 100 })
+  statusMessage!: string | null;
+
   @Column({
     name: 'user_grade',
     type: 'enum',

@@ -1,5 +1,62 @@
 import axios, { type AxiosRequestConfig } from 'axios';
 import { ENV } from './env';
+import { UserGrade } from './user';
+
+/** 공개 프로필 */
+export type PublicUser = {
+  id: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  userGrade?: UserGrade | null;
+  statusMessage?: string | null;
+};
+
+// presign 응답은 서버 구현에 따라 이름이 조금 다를 수 있어 유연 처리
+export type Presign =
+  | {
+      url: string;
+      headers?: Record<string, string>;
+      key: string;
+      mediaId: string;
+    }
+  | {
+      uploadUrl: string;
+      headers?: Record<string, string>;
+      key: string;
+      mediaId: string;
+    };
+
+// ===== 프로필 =====
+export type ProfileResponse = {
+  id: string;
+  email: string;
+  displayName: string;
+  statusMessage: string | null;
+  avatarUrl: string | null;
+};
+
+/** 특정 사용자의 공개 미디어 */
+export type UserMediaNode = {
+  id: string;
+  hlsKey: string;
+  originalFilename: string;
+  title: string;
+  contentType: string;
+  size: number | null;
+  createdAt: string;
+  author: { id: string; displayName: string; avatarUrl: string | null };
+  likeCount: number;
+  commentCount: number;
+};
+export type UserMediaResponse = {
+  nodes: UserMediaNode[];
+  pageInfo: { endCursor: string | null; hasNextPage: boolean };
+};
+
+export type FollowCounts = {
+  followerCount: number;
+  followingCount: number;
+};
 
 // Axios 인스턴스
 export const http = axios.create({
@@ -90,21 +147,6 @@ export async function signUp(
   });
 }
 
-// presign 응답은 서버 구현에 따라 이름이 조금 다를 수 있어 유연 처리
-export type Presign =
-  | {
-      url: string;
-      headers?: Record<string, string>;
-      key: string;
-      mediaId: string;
-    }
-  | {
-      uploadUrl: string;
-      headers?: Record<string, string>;
-      key: string;
-      mediaId: string;
-    };
-
 /** 영상 원본 업로드를 위한 presing URL 발급 요청 API */
 export async function presignUpload(
   originalFilename: string,
@@ -151,14 +193,6 @@ export function hasStoredToken(): boolean {
   return !!localStorage.getItem(KEY);
 }
 
-// ===== 프로필 =====
-export type ProfileResponse = {
-  id: string;
-  email: string;
-  displayName: string;
-  avatarUrl: string | null;
-};
-
 /** 내 프로필 (우선 /users/profile, 실패 시 /auth/profile 폴백) */
 export async function fetchProfile(): Promise<ProfileResponse> {
   try {
@@ -171,12 +205,6 @@ export async function fetchProfile(): Promise<ProfileResponse> {
   }
 }
 
-/** 공개 프로필 */
-export type PublicUser = {
-  id: string;
-  displayName: string;
-  avatarUrl: string | null;
-};
 export async function fetchPublicUser(id: string) {
   return request<PublicUser>({ url: `/users/${id}`, method: 'GET' });
 }
@@ -185,6 +213,7 @@ export async function fetchPublicUser(id: string) {
 export async function updateMyProfile(dto: {
   displayName?: string;
   avatarUrl?: string | null;
+  statusMessage?: string | null;
 }) {
   return request<ProfileResponse>({
     url: '/users/me',
@@ -193,23 +222,6 @@ export async function updateMyProfile(dto: {
   });
 }
 
-/** 특정 사용자의 공개 미디어 */
-export type UserMediaNode = {
-  id: string;
-  hlsKey: string;
-  originalFilename: string;
-  title: string;
-  contentType: string;
-  size: number | null;
-  createdAt: string;
-  author: { id: string; displayName: string; avatarUrl: string | null };
-  likeCount: number;
-  commentCount: number;
-};
-export type UserMediaResponse = {
-  nodes: UserMediaNode[];
-  pageInfo: { endCursor: string | null; hasNextPage: boolean };
-};
 export async function fetchUserMedia(
   userId: string,
   limit = 20,
@@ -258,9 +270,9 @@ export async function unfollowUser(targetUserId: string) {
   });
 }
 
-export async function getFollowerCount(userId: string) {
-  return request<{ count: number }>({
-    url: `/users/${userId}/followers/count`,
+export async function getFollowCounts(userId: string) {
+  return request<FollowCounts>({
+    url: `/users/${userId}/follow/counts`,
     method: 'GET',
   });
 }
