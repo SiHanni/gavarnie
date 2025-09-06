@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useMemo, useRef, useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import type { RecentMediaNode } from '@/lib/types';
 import { joinHls } from '@/lib/url';
 import { filenameWithoutExt } from '@/lib/strings';
@@ -14,7 +15,6 @@ import { useMediaLike } from '@/hooks/useMediaLike';
 import { useShareModal } from '@/contexts/ShareModalContext';
 import ProgressBar from '@/components/ProgressBar';
 import { useCommentsPanel } from '@/contexts/CommentsPanelContext';
-import { useRouter } from 'next/navigation';
 import FollowButton from './FollowButton';
 
 function isAudio(node: RecentMediaNode) {
@@ -29,6 +29,8 @@ export default function FeedSnapItem({
   overlayAvatarSize?: number;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+
   const streamUrl = useMemo(() => joinHls(node.hlsKey), [node.hlsKey]);
   const audioKind = isAudio(node);
   const title =
@@ -36,8 +38,7 @@ export default function FeedSnapItem({
     filenameWithoutExt(node.originalFilename);
 
   const { open: openShare } = useShareModal();
-  const { liked, count, toggle } = useMediaLike(node.id);
-
+  const { count, toggle } = useMediaLike(node.id);
   const { open: openComments } = useCommentsPanel();
 
   const { width, height } = useStageBox(80, 0.96, 9 / 16);
@@ -48,7 +49,7 @@ export default function FeedSnapItem({
 
   const [visible, setVisible] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(true); // 기본 음소거 자동재생
+  const [muted, setMuted] = useState(true);
   const [volume, setVolume] = useState(0.7);
 
   // 진행바
@@ -96,7 +97,7 @@ export default function FeedSnapItem({
     };
   }, [visible, muted, volume, audioKind]);
 
-  // 진행률/버퍼 동기화
+  // 진행률/버퍼
   useEffect(() => {
     const m = audioKind ? audioRef.current : videoRef.current;
     if (!m) return;
@@ -148,8 +149,6 @@ export default function FeedSnapItem({
     togglePlay();
   };
 
-  const stop = (e: React.MouseEvent) => e.stopPropagation();
-
   const onSeek = (ratio: number) => {
     const m = audioKind ? audioRef.current : videoRef.current;
     if (!m || !Number.isFinite(dur) || dur <= 0) return;
@@ -157,7 +156,6 @@ export default function FeedSnapItem({
     if (visible) m.play().catch(() => {});
   };
 
-  // 크기
   const autoAvatar = Math.round(height * 0.04);
   const AVATAR_SIZE = overlayAvatarSize ?? autoAvatar;
   const NAME_GAP = Math.max(6, Math.round(AVATAR_SIZE * 0.35));
@@ -169,7 +167,7 @@ export default function FeedSnapItem({
     >
       <div className='h-full w-full grid place-items-center'>
         <div className='flex items-center gap-5'>
-          {/* ===== 프레임 ===== */}
+          {/* 프레임 */}
           <div
             role='region'
             aria-label='미디어 프레임'
@@ -182,11 +180,10 @@ export default function FeedSnapItem({
                 src={streamUrl}
                 muted={muted}
                 fit='contain'
-                onToggle={onMediaToggle} // 비디오 자체에서 토글
+                onToggle={onMediaToggle}
               />
             ) : (
               <div className='w-full h-full grid place-items-center'>
-                {/* 오디오: 커버 탭으로 토글 (pointer 안정화) */}
                 <div
                   className='w-[min(88%,520px)] aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-neutral-700 to-neutral-900 border border-neutral-700'
                   style={{ touchAction: 'manipulation' }}
@@ -200,7 +197,7 @@ export default function FeedSnapItem({
               </div>
             )}
 
-            {/* ===== 항상 하단 고정 진행바 ===== */}
+            {/* 진행바 */}
             <div className='absolute inset-x-0 bottom-0 z-20'>
               <ProgressBar
                 className='px-3'
@@ -213,7 +210,7 @@ export default function FeedSnapItem({
               />
             </div>
 
-            {/* 좌상단 컨트롤 (컨테이너 none, 내부 auto) */}
+            {/* 좌상단 컨트롤 */}
             <div className='absolute top-3 left-3 flex items-center gap-2 z-30 pointer-events-none'>
               <button
                 onPointerUp={e => {
@@ -251,23 +248,6 @@ export default function FeedSnapItem({
                     draggable={false}
                   />
                 </button>
-
-                <div
-                  className='hidden group-hover:flex group-focus-within:flex items-center gap-2 absolute left-10 top-1/2 -translate-y-1/2
-                             bg-black/40 backdrop-blur px-3 py-2 rounded-xl border border-white/10 pointer-events-auto'
-                  onClick={stop}
-                >
-                  <input
-                    type='range'
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={volume}
-                    onChange={e => setVolume(parseFloat(e.target.value))}
-                    className='w-44 accent-white'
-                    aria-label='볼륨'
-                  />
-                </div>
               </div>
             </div>
 
@@ -277,7 +257,7 @@ export default function FeedSnapItem({
                 className='flex items-center pointer-events-auto'
                 style={{ gap: NAME_GAP }}
               >
-                {/* ✅ 아바타만 프로필로 이동 */}
+                {/* 아바타만 프로필 이동 */}
                 <button
                   type='button'
                   onClick={e => {
@@ -291,7 +271,6 @@ export default function FeedSnapItem({
                   <Avatar src={node.author.avatarUrl} size={AVATAR_SIZE} />
                 </button>
 
-                {/* 이름 + 구독 버튼 (여긴 네비게이션 없음) */}
                 <div className='text-sm font-semibold flex items-center gap-2'>
                   {node.author.displayName}
                   <FollowButton targetUserId={node.author.id} size='sm' />
@@ -304,7 +283,7 @@ export default function FeedSnapItem({
             </div>
           </div>
 
-          {/* ===== 우측 액션 레일 (모달보다 아래, 콘텐츠보다 위) ===== */}
+          {/* 우측 액션 레일 */}
           <div
             className='relative z-[100] pointer-events-auto'
             style={{ height }}
