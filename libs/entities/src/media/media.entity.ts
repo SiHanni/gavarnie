@@ -46,6 +46,26 @@ export class Media {
   @Column({ name: 'error', type: 'text', nullable: true })
   error!: string | null;
 
+  @Column({
+    name: 'thumbnail_key',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  thumbnailKey!: string | null; // 예: thumbs/{id}/poster_540.webp
+
+  @Column({ name: 'thumbnail_width', type: 'int', nullable: true })
+  thumbnailWidth!: number | null;
+
+  @Column({ name: 'thumbnail_height', type: 'int', nullable: true })
+  thumbnailHeight!: number | null;
+
+  @Column({ name: 'thumbnail_updated_at', type: 'datetime', nullable: true })
+  thumbnailUpdatedAt!: Date | null;
+
+  @Column({ name: 'thumbnail_version', type: 'int', default: 1 })
+  thumbnailVersion!: number;
+
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt!: Date;
 

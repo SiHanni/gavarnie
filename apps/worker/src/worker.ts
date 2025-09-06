@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { DataSource, Repository } from 'typeorm';
 import { Worker, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
-import { transcodeToHLS } from './transcode';
+import { transcodeToHLSAndThumbnails } from './transcode';
 import {
   User,
   Media,
@@ -24,8 +24,8 @@ async function createDataSource() {
     password: process.env.MYSQL_PASSWORD || 'root',
     database: process.env.MYSQL_DB || '',
     entities: [User, Media, MediaCore, MediaReaction, Comment],
-    synchronize: false, // 운영 컨벤션 유지
-    logging: true, // 필요 시 켜서 디버깅
+    synchronize: false,
+    logging: true,
   });
   await ds.initialize();
   return ds;
@@ -33,22 +33,19 @@ async function createDataSource() {
 
 /**
  * 목적: BullMQ 'transcode' 큐 컨슈머.
- * 동작: media 상태를 PROCESSING→READY/FAILED로 갱신(TypeORM Repo + API의 공용 엔티티).
+ * 동작: media 상태를 PROCESSING→READY/FAILED로 갱신 + 썸네일 생성/반영
  */
 async function main() {
-  // 1) TypeORM DataSource / Repository
   const dataSource = await createDataSource();
   const mediaRepository: Repository<Media> = dataSource.getRepository(Media);
   const mediaCoreRepository: Repository<MediaCore> =
     dataSource.getRepository(MediaCore);
 
-  // 2) Redis (BullMQ)
   const connection = new IORedis(process.env.REDIS_URL!, {
     maxRetriesPerRequest: null,
     enableReadyCheck: true,
   });
 
-  // 3) Worker (동시성 고정 1 — ENV 추가 없음)
   const worker = new Worker<JobData>(
     QUEUE_NAME,
     async (job) => {
@@ -69,6 +66,10 @@ async function main() {
           skipped: true,
           status: MEDIA_STATUS.READY,
           hlsKey: media.hlsKey,
+
+          thumbnailKey: media.thumbnailKey ?? null,
+          thumbnailWidth: media.thumbnailWidth ?? null,
+          thumbnailHeight: media.thumbnailHeight ?? null,
         };
       }
 
@@ -81,16 +82,21 @@ async function main() {
       );
 
       try {
-        // (c) FFmpeg → HLS → MinIO 업로드
-        const hlsKey = await transcodeToHLS(
-          mediaId,
-          srcKey,
-          contentType ?? media.contentType,
-        );
+        // (c) FFmpeg → HLS + 썸네일 → MinIO 업로드
+        const { hlsKey, thumbnailKey, thumbnailWidth, thumbnailHeight } =
+          await transcodeToHLSAndThumbnails(
+            mediaId,
+            srcKey,
+            contentType ?? media.contentType,
+          );
 
-        // (d) READY 전이 + hlsKey 기록
         media.status = MEDIA_STATUS.READY;
         media.hlsKey = hlsKey;
+        media.thumbnailKey = thumbnailKey;
+        media.thumbnailWidth = thumbnailWidth;
+        media.thumbnailHeight = thumbnailHeight;
+        media.thumbnailUpdatedAt = new Date();
+        // 초기 생성 단계에서는 버전 증가 없이 기본값 유지 (재생성 시에만 증가 고려)
         await mediaRepository.save(media);
 
         // core update
@@ -103,8 +109,17 @@ async function main() {
           await mediaCoreRepository.save(mediaCore);
         }
 
-        console.log(`[worker] READY mediaId=${mediaId} hlsKey=${hlsKey}`);
-        return { ok: true, status: MEDIA_STATUS.READY, hlsKey };
+        console.log(
+          `[worker] READY mediaId=${mediaId} hlsKey=${hlsKey} thumb=${thumbnailKey}`,
+        );
+        return {
+          ok: true,
+          status: MEDIA_STATUS.READY,
+          hlsKey,
+          thumbnailKey,
+          thumbnailWidth,
+          thumbnailHeight,
+        };
       } catch (e: any) {
         const msg = e?.message || String(e);
         media.status = MEDIA_STATUS.FAILED as any;
@@ -120,25 +135,22 @@ async function main() {
         }
 
         console.error(`[worker] FAILED mediaId=${mediaId} error=${msg}`);
-
         throw new Error(msg);
       }
     },
     {
       connection,
       prefix: 'bull',
-      concurrency: 1, // 컨벤션: ENV 추가 없이 고정
+      concurrency: 1,
     },
   );
 
-  // 4) Queue Events (옵션 로깅)
   const events = new QueueEvents(QUEUE_NAME, { connection, prefix: 'bull' });
   events.on('completed', ({ jobId }) => console.log('✅ completed', jobId));
   events.on('failed', ({ jobId, failedReason }) =>
     console.error('💥 failed', jobId, failedReason),
   );
 
-  // 5) 그레이스풀 종료
   const shutdown = async () => {
     try {
       await worker.close();

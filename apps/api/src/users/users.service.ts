@@ -155,17 +155,24 @@ export class UsersService {
       .addOrderBy('media.id', 'DESC')
       .limit(limit + 1)
       .select([
-        'media.id               AS m_id',
-        'media.hls_key          AS m_hls_key',
-        'media.original_filename AS m_original_filename',
-        'media.content_type     AS m_content_type',
-        'media.size             AS m_size',
-        'media.created_at       AS m_created_at',
-        'core.id                AS mc_id',
-        'core.title             AS mc_title',
-        'owner.id               AS owner_id',
-        'owner.display_name     AS owner_display_name',
-        'owner.avatar_url       AS owner_avatar_url',
+        'media.id                 AS m_id',
+        'media.hls_key            AS m_hls_key',
+        'media.original_filename  AS m_original_filename',
+        'media.content_type       AS m_content_type',
+        'media.size               AS m_size',
+        'media.created_at         AS m_created_at',
+
+        'media.thumbnail_key      AS m_thumbnail_key',
+        'media.thumbnail_width    AS m_thumbnail_width',
+        'media.thumbnail_height   AS m_thumbnail_height',
+        'media.thumbnail_version  AS m_thumbnail_version',
+
+        'core.id                  AS mc_id',
+        'core.title               AS mc_title',
+
+        'owner.id                 AS owner_id',
+        'owner.display_name       AS owner_display_name',
+        'owner.avatar_url         AS owner_avatar_url',
       ]);
 
     if (cursor) {
@@ -183,6 +190,12 @@ export class UsersService {
       m_content_type: string;
       m_size: string | number | null;
       m_created_at: Date;
+
+      m_thumbnail_key: string | null;
+      m_thumbnail_width: number | null;
+      m_thumbnail_height: number | null;
+      m_thumbnail_version: number | null;
+
       mc_id: string;
       mc_title: string;
       owner_id: string;
@@ -234,6 +247,10 @@ export class UsersService {
       },
       likeCount: likeMap.get(String(r.mc_id)) ?? 0,
       commentCount: cmtMap.get(String(r.mc_id)) ?? 0,
+      thumbnailKey: r.m_thumbnail_key ?? null,
+      thumbnailWidth: r.m_thumbnail_width ?? null,
+      thumbnailHeight: r.m_thumbnail_height ?? null,
+      thumbnailVersion: r.m_thumbnail_version ?? 1,
     }));
 
     const last = pageRows.at(-1)!;

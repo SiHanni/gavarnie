@@ -36,6 +36,10 @@ function guessContentType(file: string) {
   if (ext === '.mp4') return 'video/mp4';
   if (ext === '.aac') return 'audio/aac';
   if (ext === '.mp3') return 'audio/mpeg';
+  // [ADDED] image ct
+  if (ext === '.webp') return 'image/webp';
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.png') return 'image/png';
   return 'application/octet-stream';
 }
 
