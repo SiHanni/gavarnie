@@ -26,7 +26,7 @@ export default function FollowButton({
   if (isMine) return null;
 
   const { isFollowing, isLoading, toggle } = useFollow(targetUserId);
-  const label = isFollowing ? '구독 중' : '구독';
+  const label = isFollowing ? '팔로잉' : '팔로우';
 
   const sizeCls: Record<Size, string> = {
     sm: 'h-7 px-3 text-[11px]',

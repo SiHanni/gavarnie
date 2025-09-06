@@ -1,65 +1,107 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
+import { clearToken } from '@/lib/http';
+import { clearUserProfile } from '@/lib/user';
 
 export default function ProfileActionsMenu({
-  canEdit = false, // 부모에서 "내 프로필"일 때만 true
+  canEdit,
   onEdit,
+  onAfterLogout,
 }: {
-  canEdit?: boolean;
-  onEdit?: () => void;
+  canEdit: boolean;
+  onEdit: () => void;
+  onAfterLogout?: () => void;
 }) {
-  // canEdit=false면 훅 호출 전에 바로 렌더 중단(로그인X/내 프로필 아님)
-  if (!canEdit) return null;
-
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
+  // 외부 클릭 닫기
   useEffect(() => {
-    if (!open) return;
     const onDoc = (e: MouseEvent) => {
       if (!ref.current) return;
       if (!ref.current.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
     document.addEventListener('mousedown', onDoc);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  const doLogout = () => {
+    clearToken();
+    clearUserProfile();
+    window.dispatchEvent(new CustomEvent('auth:logout'));
+    setOpen(false);
+    // 모바일(≤540px)은 홈으로 이동 콜백
+    if (typeof window !== 'undefined' && window.innerWidth <= 540) {
+      onAfterLogout?.();
+    }
+  };
 
   return (
-    <div ref={ref} className='relative'>
+    <div className='relative' ref={ref}>
+      {/* see_more 트리거 버튼 (컴팩트) */}
       <button
         type='button'
         aria-label='더보기'
-        aria-haspopup='menu'
-        aria-expanded={open}
-        className='w-9 h-9 grid place-items-center rounded-full border border-white/15 bg-white/5 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30'
         onClick={() => setOpen(v => !v)}
+        className='grid place-items-center rounded-full hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20'
+        style={{
+          width: 'clamp(28px, 6vw, 34px)',
+          height: 'clamp(28px, 6vw, 34px)',
+        }}
       >
-        <span className='text-xl leading-none'>⋯</span>
+        <Image
+          src='/images/see_more.png'
+          alt=''
+          width={16}
+          height={16}
+          style={{
+            width: 'clamp(12px, 3vw, 16px)',
+            height: 'clamp(12px, 3vw, 16px)',
+          }}
+        />
       </button>
 
+      {/* 메뉴 (폭을 내용 길이에 맞춰 컴팩트하게) */}
       {open && (
         <div
-          role='menu'
-          className='absolute right-0 mt-2 w-52 rounded-xl border border-white/10 bg-neutral-950 shadow-2xl p-1 z-[100]'
+          className='absolute right-0 z-50 mt-1 inline-block rounded-lg border border-white/10 bg-black/90 backdrop-blur-md text-white shadow-xl'
+          style={{
+            width: 'max-content', // 글자만큼만
+            maxWidth: 'calc(100vw - 24px)', // 화면 밖 방지
+            fontSize: 'clamp(11px, 3vw, 13px)', // 모바일 축소
+            paddingBlock: 'clamp(3px, 0.8vw, 5px)',
+            transform: 'translateX(clamp(15px, 5vw, 13px))',
+          }}
         >
+          {canEdit && (
+            <button
+              type='button'
+              onClick={() => {
+                setOpen(false);
+                onEdit();
+              }}
+              className='block w-full text-left hover:bg-white/10 transition-colors whitespace-nowrap'
+              style={{
+                paddingInline: 'clamp(8px, 2.4vw, 10px)',
+                paddingBlock: 'clamp(6px, 2vw, 8px)',
+              }}
+            >
+              프로필 편집
+            </button>
+          )}
+
           <button
-            role='menuitem'
             type='button'
-            className='w-full text-left px-3 py-2 rounded-lg hover:bg-white/10'
-            onClick={() => {
-              setOpen(false);
-              onEdit?.();
+            onClick={doLogout}
+            className='block w-full text-left hover:bg-white/10 text-red-300 transition-colors whitespace-nowrap'
+            style={{
+              paddingInline: 'clamp(8px, 2.4vw, 10px)',
+              paddingBlock: 'clamp(6px, 2vw, 8px)',
             }}
           >
-            프로필 편집
+            로그아웃
           </button>
         </div>
       )}

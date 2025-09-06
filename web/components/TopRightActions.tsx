@@ -2,18 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAuthModal } from '@/contexts/AuthModalContext';
-import {
-  hasStoredToken,
-  getAccessToken,
-  clearToken,
-  fetchProfile,
-} from '@/lib/http';
-import {
-  loadUserProfile,
-  saveUserProfile,
-  clearUserProfile,
-  type UserProfile,
-} from '@/lib/user';
+import { hasStoredToken, getAccessToken } from '@/lib/http';
+import { loadUserProfile, type UserProfile } from '@/lib/user';
 import { useUploadModal } from '@/contexts/UploadModalContext';
 import { usePathname } from 'next/navigation';
 
@@ -28,83 +18,59 @@ const DEFAULTS = {
   loginColor: '#59319f',
 };
 
-export default function TopRightActions(props: Partial<typeof DEFAULTS>) {
+type ExtraProps = {
+  /** 이 픽셀보다 작아지면 컴포넌트를 숨김 (기본 1024) */
+  hideBelowPx?: number;
+  /** 필요 시 외부에서 클래스 추가 */
+  className?: string;
+};
+
+export default function TopRightActions(
+  props: Partial<typeof DEFAULTS> & ExtraProps
+) {
   const pathname = usePathname();
   if (pathname?.startsWith('/terms')) return null;
+
   const {
     top = DEFAULTS.top,
     right = DEFAULTS.right,
     gap = DEFAULTS.gap,
-    avatarSize = DEFAULTS.avatarSize,
-    loginBtnHeight = DEFAULTS.loginBtnHeight,
-    loginBtnPaddingX = DEFAULTS.loginBtnPaddingX,
     uploadColor = DEFAULTS.uploadColor,
-    loginColor = DEFAULTS.loginColor,
+    hideBelowPx = 1024, //  화면 폭 임계치
+    className = '',
   } = props;
 
-  // 이름만 명확히: 로그인 모달 오픈
   const { open: openLogin } = useAuthModal();
-  // 업로드 모달 오픈
   const { open: openUpload } = useUploadModal();
 
-  // ✅ Hydration/깜빡임 방지: 마운트 전엔 렌더 X
   const [mounted, setMounted] = useState(false);
 
-  const [hasToken, setHasToken] = useState<boolean>(
-    typeof window !== 'undefined' ? hasStoredToken() : false
-  );
-  const [user, setUser] = useState<UserProfile | null>(
-    typeof window !== 'undefined' ? loadUserProfile() : null
-  );
-  const [menuOpen, setMenuOpen] = useState(false);
-  const closeTimer = useRef<number | null>(null);
+  // 화면 폭에 따른 표시/숨김 제어
+  const [wideEnough, setWideEnough] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window === 'undefined') return;
 
-    // 토큰 있고 프로필(또는 avatarUrl) 없으면 1회 최신화
-    if (hasToken && (!user || !user.avatarUrl)) {
-      fetchProfile()
-        .then(p => {
-          saveUserProfile(p);
-          setUser(p);
-        })
-        .catch(() => {
-          /* 실패시 캐시 유지 */
-        });
+    const mq = window.matchMedia(`(min-width: ${hideBelowPx}px)`);
+    // 초기 값 반영
+    setWideEnough(mq.matches);
+
+    const onChange = (e: MediaQueryListEvent) => setWideEnough(e.matches);
+
+    // 표준: 현대 브라우저
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', onChange);
+      return () => mq.removeEventListener('change', onChange);
     }
 
-    // 로그인/로그아웃 이벤트로 즉시 반영
-    const onLogin = (e: Event) => {
-      const p = (e as CustomEvent).detail as UserProfile | undefined;
-      if (p) saveUserProfile(p);
-      setUser(p || loadUserProfile());
-      setHasToken(true);
-    };
-    const onLogout = () => {
-      setUser(null);
-      setHasToken(false);
-    };
-
-    window.addEventListener('auth:login', onLogin as EventListener);
-    window.addEventListener('auth:logout', onLogout as EventListener);
+    // 폴백: 구형 사파리 등
+    mq.onchange = onChange;
     return () => {
-      window.removeEventListener('auth:login', onLogin as EventListener);
-      window.removeEventListener('auth:logout', onLogout as EventListener);
+      mq.onchange = null;
     };
-  }, []);
+  }, [hideBelowPx]);
 
-  const doLogout = () => {
-    clearToken();
-    clearUserProfile();
-    setUser(null);
-    setHasToken(false);
-    window.dispatchEvent(new CustomEvent('auth:logout'));
-  };
-
-  const loggedIn = hasToken && !!getAccessToken() && !!user;
-
-  // 업로드 버튼 클릭: 토큰 없으면 로그인 모달, 있으면 업로드 모달
   const handleUploadClick = () => {
     if (!getAccessToken()) {
       openLogin('login');
@@ -113,11 +79,14 @@ export default function TopRightActions(props: Partial<typeof DEFAULTS>) {
     openUpload();
   };
 
-  // 마운트 전엔 렌더 안 함 → 서버/클라이언트 UI 불일치 방지
-  if (!mounted) return null;
+  // 마운트 전이거나 폭이 좁으면 렌더 X (SSR 깜빡임 방지)
+  if (!mounted || !wideEnough) return null;
 
   return (
-    <div className='fixed z-40 flex items-center' style={{ top, right, gap }}>
+    <div
+      className={`fixed z-40 flex items-center ${className}`}
+      style={{ top, right, gap }}
+    >
       {/* + 업로드 */}
       <button
         type='button'
