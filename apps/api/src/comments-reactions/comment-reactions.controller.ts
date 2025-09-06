@@ -20,7 +20,7 @@ export class CommentReactionsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')
   @Put('like')
-  @ApiOperation({ summary: '댓글 좋아용 (idempotent)' })
+  @ApiOperation({ summary: '댓글 좋아요 (idempotent)' })
   async like(@Req() req: any, @Param('commentId') commentId: string) {
     const userId = req.user?.userId as string;
     if (!userId) throw new UnauthorizedException('Authentication required.');
@@ -38,7 +38,7 @@ export class CommentReactionsController {
   }
 
   @Get('likes')
-  @ApiOperation({ summary: '댓글 좋아요 카운트 (public)' })
+  @ApiOperation({ summary: '댓글 좋아요 수 (public)' })
   async count(@Param('commentId') commentId: string) {
     return this.svc.count(commentId);
   }

@@ -20,10 +20,15 @@ export class UserMediaQueryDto {
 export class UserMediaAuthorDto {
   @ApiProperty()
   id!: string;
+
   @ApiProperty()
   displayName!: string;
+
   @ApiProperty({ nullable: true })
   avatarUrl!: string | null;
+
+  @ApiProperty()
+  handle!: string;
 }
 
 export class UserMediaNodeDto {

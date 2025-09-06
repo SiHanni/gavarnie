@@ -37,4 +37,6 @@ export class MyProfileDto {
   avatarUrl!: string | null;
   @ApiProperty({ nullable: true })
   statusMessage!: string | null;
+  @ApiProperty()
+  handle!: string;
 }

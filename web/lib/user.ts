@@ -1,4 +1,3 @@
-// web/src/lib/user.ts
 export type UserGrade = 'basic' | 'plus' | 'premium';
 
 export type UserProfile = {
@@ -7,6 +6,7 @@ export type UserProfile = {
   displayName?: string;
   avatarUrl?: string | null;
   userGrade?: UserGrade | null;
+  handle?: string;
 };
 
 const KEY = 'userProfile';
@@ -46,12 +46,13 @@ export function setUserFromToken(token: string): UserProfile | null {
     displayName: p.displayName || p.name || 'User',
     avatarUrl: p.avatarUrl ?? null,
     userGrade: coerceUserGrade(p.userGrade),
+    handle: p.handle ?? undefined, // ← 토큰에 있으면 저장
   };
   localStorage.setItem(KEY, JSON.stringify(profile));
   return profile;
 }
 
-/** 병합 저장: 서버 응답에 userGrade가 빠져도 기존 값을 보존 */
+/** 병합 저장: 서버 응답에 userGrade/handle이 빠져도 기존 값을 보존 */
 export function saveUserProfile(p: UserProfile) {
   if (typeof window === 'undefined') return;
   const prev = loadUserProfile();
@@ -59,6 +60,7 @@ export function saveUserProfile(p: UserProfile) {
     ...prev,
     ...p,
     userGrade: coerceUserGrade(p.userGrade ?? prev?.userGrade ?? 'basic'),
+    handle: p.handle ?? prev?.handle ?? undefined,
   };
   localStorage.setItem(KEY, JSON.stringify(merged));
 }

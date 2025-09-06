@@ -72,6 +72,9 @@ export class Media {
   @UpdateDateColumn({ name: 'updated_at', type: 'datetime' })
   updatedAt!: Date;
 
+  @Column({ name: 'deleted_at', type: 'datetime', nullable: true })
+  deletedAt!: Date | null;
+
   @OneToOne(() => MediaCore, mc => mc.media)
   core!: MediaCore;
 }

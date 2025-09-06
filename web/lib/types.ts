@@ -9,6 +9,7 @@ export interface AuthorLite {
   id: string;
   displayName: string;
   avatarUrl: string | null;
+  handle: string; // ← @handle 기반 프로필 라우팅에 필요
 }
 
 export interface RecentMediaNode {

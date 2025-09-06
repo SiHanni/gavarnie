@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useMemo, useRef, useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { RecentMediaNode } from '@/lib/types';
 import { joinHls } from '@/lib/url';
 import { filenameWithoutExt } from '@/lib/strings';
@@ -41,7 +41,7 @@ export default function FeedSnapItem({
   overlayAvatarSize?: number;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const isMobile = useIsMobile();
   const BOTTOM_BAR_H = 68; // 프로젝트 하단 탭 높이
@@ -195,11 +195,26 @@ export default function FeedSnapItem({
   const AVATAR_SIZE = overlayAvatarSize ?? autoAvatar;
   const NAME_GAP = Math.max(6, Math.round(AVATAR_SIZE * 0.35));
 
+  // ★ URL이 나(id)를 가리키면 스스로 스크롤
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const targetId = searchParams?.get('m') || null;
+    const hashMatch =
+      typeof window !== 'undefined' &&
+      window.location.hash === `#mid-${node.id}`;
+    if (targetId === node.id || hashMatch) {
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ block: 'start', behavior: 'auto' });
+      });
+    }
+  }, [searchParams, node.id]);
+
   return (
     <section
+      id={`mid-${node.id}`}
       ref={rootRef}
       className='snap-start h-[100svh] bg-black text-white relative overflow-hidden'
-      // 하단 탭/안전영역 만큼 여유
       style={
         isMobile
           ? {
@@ -239,7 +254,7 @@ export default function FeedSnapItem({
               </div>
             )}
 
-            {/* 진행바 (프레임 최상단 레이어 바로 아래) */}
+            {/* 진행바 */}
             <div className='absolute inset-x-0 bottom-0 z-40'>
               <ProgressBar
                 className='px-3'
@@ -299,15 +314,11 @@ export default function FeedSnapItem({
 
                   <div
                     className='absolute left-full top-0 w-3 h-full'
-                    onMouseEnter={openVol}
-                    onMouseLeave={closeVolDelayed}
                     aria-hidden
                   />
                   <div
                     className={`absolute left-full top-1/2 -translate-y-1/2 ml-2 ${volOpenNow ? 'flex' : 'hidden'}`}
                     style={{ zIndex: 70 }}
-                    onMouseEnter={openVol}
-                    onMouseLeave={closeVolDelayed}
                     onPointerDown={e => e.stopPropagation()}
                     onPointerUp={e => e.stopPropagation()}
                     onClick={e => e.stopPropagation()}
@@ -369,11 +380,11 @@ export default function FeedSnapItem({
               </p>
             </div>
 
-            {/* ★ 모바일: 프레임 내부 우측 레일(가장 마지막에, 가장 위 레이어) */}
+            {/* 모바일: 프레임 내부 우측 레일 */}
             {isMobile && (
               <RightActionBar
                 variant='inside'
-                insideOffsetY={120} // 더 내려 배치하려면 값 키우기
+                insideOffsetY={120}
                 insideRight={10}
                 avatarUrl={node.author.avatarUrl || undefined}
                 likeCount={count}

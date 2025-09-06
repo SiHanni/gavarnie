@@ -19,7 +19,7 @@ const BRAND = '#5a319f';
 const PLACEHOLDER = '/images/video_placeholder.png';
 const GUTTER = 24;
 
-/** 마키(제목 슬라이드) 속도: px/sec (원하면 조절) */
+/** 마키(제목 슬라이드) 속도: px/sec */
 const MARQUEE_PX_PER_SEC = 10;
 
 const GRADE_LABEL: Record<UserGrade, string> = {
@@ -86,7 +86,7 @@ function useSidebarSpace(extraGapPx = GUTTER) {
   return space; // px
 }
 
-/** 제목 마키(왔다갔다) — 넘칠 때만 애니메이션 */
+/** 제목 마키(넘칠 때만 왕복 슬라이드) */
 function MarqueeTitle({
   text,
   speedPxPerSec = MARQUEE_PX_PER_SEC,
@@ -101,7 +101,7 @@ function MarqueeTitle({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const textRef = useRef<HTMLSpanElement | null>(null);
   const [distance, setDistance] = useState(0);
-  const [duration, setDuration] = useState(0); // sec
+  const [duration, setDuration] = useState(0);
   const [needAnim, setNeedAnim] = useState(false);
 
   const measure = () => {
@@ -122,7 +122,6 @@ function MarqueeTitle({
   };
 
   useEffect(() => {
-    // 레이아웃 확정 후 측정
     const raf = requestAnimationFrame(measure);
     window.addEventListener('resize', measure);
     const ro = new ResizeObserver(measure);
@@ -133,7 +132,6 @@ function MarqueeTitle({
       window.removeEventListener('resize', measure);
       ro.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, speedPxPerSec]);
 
   return (
@@ -163,7 +161,6 @@ function MarqueeTitle({
         {text}
       </span>
 
-      {/* 전역 키프레임 */}
       <style jsx global>{`
         @keyframes mx-pingpong {
           from {
@@ -206,7 +203,6 @@ export default function ProfilePage({ userId }: { userId: string }) {
     const onLogout = () => {
       setMe(null);
       setAuthed(false);
-      // 모바일이면 로그아웃 후 홈으로
       if (typeof window !== 'undefined') {
         const isMobile = window.matchMedia('(max-width:560px)').matches;
         if (isMobile) router.push('/');
@@ -307,18 +303,16 @@ export default function ProfilePage({ userId }: { userId: string }) {
 
   const postsCount = items.length;
 
-  /** 정확히 해당 미디어로 이동 — 앵커 + router로 모두 보장 */
+  /** 정확히 해당 미디어로 이동 — 앵커(+SPA) 모두 사용 */
   const goToMedia = (id: string, e?: React.MouseEvent) => {
-    const href = `/?m=${encodeURIComponent(id)}`;
+    const href = `/?m=${encodeURIComponent(id)}#mid-${encodeURIComponent(id)}`;
     if (e) e.preventDefault();
-    // SPA push
     router.push(href);
-    // 혹시 라우터가 막히는 환경 대비 폴백
     if (typeof window !== 'undefined') {
       setTimeout(() => {
-        if (location.search.indexOf(`m=${id}`) === -1) {
-          window.location.assign(href);
-        }
+        const hasQuery = location.search.includes(`m=${id}`);
+        const hasHash = location.hash === `#mid-${id}`;
+        if (!hasQuery || !hasHash) window.location.assign(href);
       }, 0);
     }
   };
@@ -328,18 +322,16 @@ export default function ProfilePage({ userId }: { userId: string }) {
       className='h-[100svh] overflow-y-auto overflow-x-hidden bg-black text-white md:pl-[72px] lg:pl-[260px]'
       style={{ paddingLeft: sidebarSpace || undefined }}
     >
-      {/* === 프로필 헤더: 브라우저 전체 기준 정중앙 === */}
+      {/* === 프로필 헤더 === */}
       <div
         className='relative w-[100vw] pt-6'
         style={{
           left: '50%',
-          transform: `translateX(calc(-50% - ${Math.round(
-            sidebarSpace / 2
-          )}px))`,
+          transform: `translateX(calc(-50% - ${Math.round(sidebarSpace / 2)}px))`,
         }}
       >
         <div className='mx-auto max-w-[560px] px-5 text-center'>
-          {/* 이름 + ⋯(see_more) */}
+          {/* 이름 + see_more */}
           <div className='relative flex items-center justify-center'>
             <h1
               className='font-medium text-white/90 leading-tight'
@@ -348,14 +340,13 @@ export default function ProfilePage({ userId }: { userId: string }) {
               {user.displayName}
             </h1>
 
-            {/* 내 프로필에서만 표시 */}
             {isMine && (
               <div
                 className='absolute'
                 style={{
                   top: '50%',
                   right: 'clamp(24px, 6vw, 56px)',
-                  transform: 'translateY(-50%) scale(1.6)', // see_more 버튼 크게
+                  transform: 'translateY(-50%) scale(1.6)',
                   transformOrigin: 'right center',
                 }}
               >
@@ -462,7 +453,7 @@ export default function ProfilePage({ userId }: { userId: string }) {
         </div>
       </div>
 
-      {/* === 미디어 그리드: 최소 3, 최대 4열 === */}
+      {/* === 미디어 그리드 === */}
       <section
         className='px-5 pb-8 pt-6'
         style={{ width: 'min(1040px, 100%)' }}
@@ -485,9 +476,8 @@ export default function ProfilePage({ userId }: { userId: string }) {
 
               return (
                 <li key={n.id}>
-                  {/* 앵커 + router.push (둘 다) */}
                   <a
-                    href={`/?m=${encodeURIComponent(n.id)}`}
+                    href={`/?m=${encodeURIComponent(n.id)}#mid-${encodeURIComponent(n.id)}`}
                     onClick={e => goToMedia(n.id, e)}
                     className='block w-full rounded-md overflow-hidden bg-white/[0.05] border border-white/10 hover:bg-white/[0.08] transition-colors'
                     title={n.title}
@@ -512,7 +502,7 @@ export default function ProfilePage({ userId }: { userId: string }) {
                     <div
                       className='px-3 flex items-center min-w-0'
                       style={{
-                        height: 36, // 고정 높이(카드 높이 통일)
+                        height: 36,
                         fontSize: 'clamp(12px, 2.4vw, 14px)',
                       }}
                     >

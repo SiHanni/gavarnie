@@ -11,6 +11,9 @@ export class RecentAuthorDto {
 
   @ApiProperty({ example: 'https://.../avatar.png', nullable: true })
   avatarUrl!: string | null;
+
+  @ApiProperty({ example: 'iammingki' })
+  handle!: string;
 }
 export class RecentQueryDto {
   @ApiProperty({ required: false, default: 20, minimum: 1, maximum: 50 })

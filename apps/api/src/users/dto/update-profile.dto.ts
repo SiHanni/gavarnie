@@ -2,29 +2,26 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 
 export class UpdateProfileDto {
-  @ApiPropertyOptional({ example: '르클레르', description: '표시 이름' })
+  @ApiPropertyOptional({ description: '표시 이름(닉네임)' })
   @IsOptional()
   @IsString()
-  @MaxLength(50)
   displayName?: string;
 
-  @ApiPropertyOptional({
-    example: 'https://cdn.example.com/avatars/a.png',
-    description: '프로필 이미지 URL (http/https)',
-    nullable: true,
-  })
+  @ApiPropertyOptional({ description: '아바타 URL' })
   @IsOptional()
-  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
-  @MaxLength(500)
+  @IsString()
   avatarUrl?: string | null;
 
+  @ApiPropertyOptional({ description: '상태 메시지' })
+  @IsOptional()
+  @IsString()
+  statusMessage?: string | null;
+
   @ApiPropertyOptional({
-    example: 'test status message',
-    description: '상태 메세지',
-    nullable: true,
+    description:
+      '변경할 핸들(소문자 영숫자/._, 길이 3-30, 숫자 전용 금지, 예약어/중복 불가)',
   })
   @IsOptional()
   @IsString()
-  @MaxLength(50)
-  statusMessage?: string;
+  handle?: string;
 }
