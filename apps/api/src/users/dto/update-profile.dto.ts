@@ -17,4 +17,14 @@ export class UpdateProfileDto {
   @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
   @MaxLength(500)
   avatarUrl?: string | null;
+
+  @ApiPropertyOptional({
+    example: 'test status message',
+    description: '상태 메세지',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  statusMessage?: string;
 }
