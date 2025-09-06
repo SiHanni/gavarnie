@@ -11,22 +11,6 @@ const candidates = [
 const envPath = candidates.find((p) => fs.existsSync(p));
 if (envPath) {
   dotenv({ path: envPath });
-  //const mask = (v?: string) => (v ? v.slice(0, 4) + '…' : '(empty)');
-  //console.log('[worker env] loaded:', envPath);
-  //console.log(
-  //  '[worker env] STORAGE_ENDPOINT =',
-  //  process.env.STORAGE_ENDPOINT || '(unset)',
-  //);
-  //console.log(
-  //  '[worker env] STORAGE_ACCESS_KEY =',
-  //  mask(process.env.STORAGE_ACCESS_KEY),
-  //);
-  //console.log(
-  //  '[worker env] STORAGE_SECRET_KEY =',
-  //  mask(process.env.STORAGE_SECRET_KEY),
-  //);
-  //console.log('[worker env] REDIS_URL =', process.env.REDIS_URL || '(unset)');
-  //console.log('[worker env] MYSQL_HOST =', process.env.MYSQL_HOST || '(unset)');
 } else {
   console.warn('[worker env] NO .env found. Tried:', candidates);
 }

@@ -26,9 +26,8 @@ function inferKind(contentType: string | undefined, srcKey: string): MediaKind {
 }
 
 /**
- * fluent-ffmpeg 실행을 Promise로 래핑 (타입 오버로드 준수)
- * - 타입 선언: ('end', (stdout: string|null, stderr: string|null) => void)
- * - 타입 선언: ('error', (err: Error, stdout: string|null, stderr: string|null) => void) */
+ * fluent-ffmpeg 실행을 Promise로 래핑
+ */
 function runFfmpeg(cmd: ffmpeg.FfmpegCommand): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     cmd
@@ -38,11 +37,7 @@ function runFfmpeg(cmd: ffmpeg.FfmpegCommand): Promise<void> {
         console.log('[ffmpeg] progress', p?.timemark ?? ''),
       )
       .on('end', (_stdout: string | null, _stderr: string | null) => resolve())
-      .on(
-        'error',
-        (err: Error, _stdout: string | null, _stderr: string | null) =>
-          reject(err),
-      )
+      .on('error', (err: Error) => reject(err))
       .run();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (cmd as any).on?.('stderr', (line: string) => {
@@ -51,42 +46,129 @@ function runFfmpeg(cmd: ffmpeg.FfmpegCommand): Promise<void> {
   });
 }
 
-/**
- * srcKey → 임시 입력 → FFmpeg(HLS VOD) → hls/<mediaId>/index.m3u8 업로드 → m3u8 key 반환
- * ENV: HLS_SEGMENT_SECONDS(기본 6), HLS_OUTPUT_PREFIX(기본 hls)
- */
-export async function transcodeToHLS(
+/** ffprobe로 길이/이미지 크기 확인 */
+function ffprobeAsync(input: string): Promise<ffmpeg.FfprobeData> {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(input, (err, data) => (err ? reject(err) : resolve(data)));
+  });
+}
+async function getDurationSec(input: string): Promise<number | null> {
+  try {
+    const meta = await ffprobeAsync(input);
+    const s = meta.format?.duration;
+    return typeof s === 'number'
+      ? s
+      : typeof s === 'string'
+        ? parseFloat(s)
+        : null;
+  } catch {
+    return null;
+  }
+}
+async function getImageSize(
+  input: string,
+): Promise<{ width: number; height: number } | null> {
+  try {
+    const meta = await ffprobeAsync(input);
+    const v = meta.streams?.find((s) => s.codec_type === 'video');
+    if (v?.width && v?.height) return { width: v.width, height: v.height };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** 썸네일(단일 프레임) 생성: 비디오용 */
+async function generateVideoPosterFrame(
+  input: string,
+  time: number,
+  width: number,
+  outPath: string,
+) {
+  const cmd = ffmpeg(input)
+    .seekInput(time) // -ss {time}
+    .frames(1) // -frames:v 1
+    .videoCodec('libwebp') // -c:v libwebp
+    .outputOptions([
+      '-q:v',
+      '80',
+      '-vf',
+      `scale=${width}:-1:force_original_aspect_ratio=decrease`, // 가로 기준 맞추기
+    ])
+    .output(outPath);
+  await runFfmpeg(cmd);
+}
+
+/** 썸네일(단일 프레임) 생성: 오디오용(스펙트럼) → 실패 시 단색 대체 */
+async function generateAudioPoster(
+  input: string,
+  width: number,
+  outPath: string,
+) {
+  const height = Math.round((width * 16) / 9); // 9:16 세로 비율로 맞춤
+  try {
+    const cmd = ffmpeg(input)
+      .complexFilter([`showspectrumpic=s=${width}x${height}:legend=disabled`]) // 스펙트럼 이미지
+      .frames(1)
+      .videoCodec('libwebp')
+      .outputOptions(['-q:v', '80'])
+      .output(outPath);
+    await runFfmpeg(cmd);
+  } catch {
+    // 스펙트럼 실패 시 단색(서비스 퍼플) 백업
+    const cmd = ffmpeg('color=c=0x5a319f:s=' + `${width}x${height}` + ':d=1')
+      .inputOptions(['-f', 'lavfi'])
+      .frames(1)
+      .videoCodec('libwebp')
+      .outputOptions(['-q:v', '80'])
+      .output(outPath);
+    await runFfmpeg(cmd);
+  }
+}
+
+/** HLS + 썸네일 동시 처리 함수(기존 transcodeToHLS 대체) */
+export async function transcodeToHLSAndThumbnails(
   mediaId: string,
   srcKey: string,
   contentType?: string,
-) {
+): Promise<{
+  hlsKey: string;
+  thumbnailKey: string; // thumbs/{id}/poster_540.webp
+  thumbnailWidth: number;
+  thumbnailHeight: number;
+}> {
   const segment = parseInt(process.env.HLS_SEGMENT_SECONDS || '6', 10);
   const outPrefix = process.env.HLS_OUTPUT_PREFIX || 'hls';
+  const thumbPrefix = process.env.THUMB_OUTPUT_PREFIX || 'thumbs'; // [ADDED] 썸네일 업로드 prefix
+  const thumbWidths = (process.env.THUMB_WIDTHS || '360,540,720') // [ADDED] 사이즈 세트
+    .split(',')
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => Number.isFinite(n) && n > 0);
 
   const work = mkdtempSync(join(tmpdir(), `hls-${mediaId}-`));
   const input = join(work, 'input');
   const outDir = join(work, 'out');
+  const thumbDir = join(work, 'thumbs'); // [ADDED]
   mkdirSync(outDir, { recursive: true });
+  mkdirSync(thumbDir, { recursive: true }); // [ADDED]
 
-  // 분기 판단
   const kind = inferKind(contentType, srcKey);
   console.log(
     `[transcode] mediaId=${mediaId} kind=${kind} ct=${contentType ?? '(none)'} srcKey=${srcKey}`,
   );
+
   try {
     // 1) 원본 다운로드
     await downloadToFile(srcKey, input);
 
     // 2) FFmpeg → HLS
     const cmd = ffmpeg(input).output(join(outDir, 'index.m3u8'));
-
     switch (kind) {
       case 'audio':
-        // 오디오 전용: AAC + fMP4 세그먼트
         cmd
-          .noVideo() // -vn
-          .audioCodec('aac') // -c:a aac
-          .audioBitrate('128k') // -b:a 128k
+          .noVideo()
+          .audioCodec('aac')
+          .audioBitrate('128k')
           .outputOptions([
             '-movflags',
             '+faststart',
@@ -104,12 +186,10 @@ export async function transcodeToHLS(
             join(outDir, 'seg_%05d.m4s'),
           ]);
         break;
-
       case 'video':
-        // 비디오(기본): libx264 + AAC + HLS (mpegts 세그먼트)
         cmd
-          .videoCodec('libx264') // -c:v libx264
-          .audioCodec('aac') // -c:a aac
+          .videoCodec('libx264')
+          .audioCodec('aac')
           .outputOptions([
             '-preset',
             'veryfast',
@@ -127,19 +207,14 @@ export async function transcodeToHLS(
             String(segment),
             '-hls_list_size',
             '0',
-            // 필요 시 fMP4로 통일하려면 아래 두 줄 교체:
-            // '-hls_segment_type', 'fmp4',
-            // '-hls_segment_filename', join(outDir, 'seg_%05d.m4s'),
           ]);
         break;
-
       case 'unknown':
       default:
         throw new Error(
           `Unsupported contentType/ext for HLS: contentType=${contentType ?? 'N/A'}, srcKeyExt=${extname(srcKey)}`,
         );
     }
-
     await runFfmpeg(cmd);
 
     // 3) 업로드 (hls/<id>/…)
@@ -147,9 +222,42 @@ export async function transcodeToHLS(
     await uploadDir(destPrefix, outDir);
     console.log(`[transcode] uploaded to s3 prefix=${destPrefix}/`);
 
-    return `${destPrefix}/index.m3u8`;
+    // 4) 썸네일 생성 (poster_360/540/720.webp)
+    let poster540 = '';
+    for (const w of thumbWidths) {
+      const outPath = join(thumbDir, `poster_${w}.webp`);
+      if (kind === 'video') {
+        const duration = (await getDurationSec(input)) ?? 0;
+        const t =
+          duration > 0
+            ? Math.max(0, Math.min(duration * 0.1, Math.max(duration - 0.2, 0)))
+            : 0; // 10% 지점(백업: 0s)
+        await generateVideoPosterFrame(input, t, w, outPath);
+      } else {
+        await generateAudioPoster(input, w, outPath);
+      }
+      if (w === 540) poster540 = outPath;
+    }
+
+    // 5) 썸네일 업로드 (thumbs/<id>/…)
+    const thumbDestPrefix = `${thumbPrefix}/${mediaId}`;
+    await uploadDir(thumbDestPrefix, thumbDir);
+    console.log(`[thumbs] uploaded to s3 prefix=${thumbDestPrefix}/`);
+
+    // 6) 대표(540) 크기 측정 → 리턴
+    const dim = poster540 ? await getImageSize(poster540) : null;
+    const width = dim?.width ?? 540;
+    const height = dim?.height ?? Math.round((540 * 16) / 9);
+    const thumbnailKey = `${thumbDestPrefix}/poster_540.webp`;
+
+    return {
+      hlsKey: `${destPrefix}/index.m3u8`,
+      thumbnailKey,
+      thumbnailWidth: width,
+      thumbnailHeight: height,
+    };
   } finally {
-    // 4) 임시 정리
+    // 7) 임시 정리
     try {
       rmSync(work, { recursive: true, force: true });
     } catch {}
