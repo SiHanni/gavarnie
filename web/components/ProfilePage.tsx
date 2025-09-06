@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   fetchPublicUser,
@@ -14,6 +13,7 @@ import {
 import { loadUserProfile, type UserGrade } from '@/lib/user';
 import FollowButton from '@/components/FollowButton';
 import ProfileActionsMenu from '@/components/ProfileActionsMenu';
+import { joinMediaObject, buildThumbSrcSet } from '@/lib/url';
 
 const BRAND = '#5a319f';
 const GRADE_LABEL: Record<UserGrade, string> = {
@@ -21,6 +21,8 @@ const GRADE_LABEL: Record<UserGrade, string> = {
   plus: 'Plus',
   premium: 'Premium',
 };
+
+const PLACEHOLDER = '/images/video_placeholder.png';
 
 export default function ProfilePage({ userId }: { userId: string }) {
   const router = useRouter();
@@ -231,30 +233,50 @@ export default function ProfilePage({ userId }: { userId: string }) {
           </div>
         ) : (
           <ul className='grid grid-cols-3 gap-[2px] md:gap-1'>
-            {items.map(n => (
-              <li key={n.id}>
-                <button
-                  onClick={() => {
-                    // TODO: 홈에서 특정 미디어로 점프
-                    window.location.href = '/';
-                  }}
-                  className='block w-full rounded-md overflow-hidden bg-white/[0.05] border border-white/10 hover:bg-white/[0.08] transition-colors'
-                  title={n.title}
-                >
-                  <div className='aspect-[9/16] grid place-items-center'>
-                    <Image
-                      src='/images/video_placeholder.png'
-                      alt=''
-                      width={56}
-                      height={56}
-                    />
-                  </div>
-                  <div className='px-2 py-1 text-[11px] line-clamp-2 text-left'>
-                    {n.title}
-                  </div>
-                </button>
-              </li>
-            ))}
+            {items.map(n => {
+              // [ADDED] 대표 540 썸네일 절대경로 및 srcset 구성 (없으면 플레이스홀더)
+              const v = (n as any).thumbnailVersion ?? 1;
+              const hasThumb = !!(n as any).thumbnailKey;
+              const src = hasThumb
+                ? joinMediaObject((n as any).thumbnailKey, v)
+                : PLACEHOLDER;
+              const srcSet = hasThumb
+                ? buildThumbSrcSet((n as any).thumbnailKey, v)
+                : undefined;
+
+              return (
+                <li key={n.id}>
+                  <button
+                    onClick={() => {
+                      // TODO: 홈에서 특정 미디어로 점프
+                      window.location.href = '/';
+                    }}
+                    className='block w-full rounded-md overflow-hidden bg-white/[0.05] border border-white/10 hover:bg-white/[0.08] transition-colors'
+                    title={n.title}
+                  >
+                    {/* [CHANGED] 썸네일 적용: 고정 비율 + object-cover */}
+                    <div className='aspect-[9/16] relative'>
+                      <img
+                        src={src}
+                        srcSet={srcSet}
+                        sizes='(max-width: 768px) 33vw, 240px'
+                        alt=''
+                        className='absolute inset-0 w-full h-full object-cover'
+                        loading='lazy'
+                        decoding='async'
+                        onError={e => {
+                          e.currentTarget.src = PLACEHOLDER;
+                          e.currentTarget.srcset = '';
+                        }}
+                      />
+                    </div>
+                    <div className='px-2 py-1 text-[11px] line-clamp-2 text-left'>
+                      {n.title}
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
         <div ref={bottomRef} className='h-2' />
