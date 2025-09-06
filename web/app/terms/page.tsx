@@ -43,11 +43,11 @@ export default function TermsPage() {
 
           <div className='mt-2 flex items-center gap-3'>
             <img
-              src='/images/appIcon.png'
+              src='/images/favicon.png'
               alt='Catarie'
               width={40}
               height={40}
-              className='w-10 h-10'
+              className='w-20 h-20'
               draggable={false}
             />
             <h1 className='text-3xl md:text-5xl font-extrabold tracking-tight'>
