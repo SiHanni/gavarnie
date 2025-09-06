@@ -1,18 +1,17 @@
 'use client';
 
 import React from 'react';
-import clsx from 'clsx';
 import { useFollow } from '@/hooks/useFollow';
-import { getAccessToken } from '@/lib/http';
+import { loadUserProfile } from '@/lib/user';
 import { useAuthModal } from '@/contexts/AuthModalContext';
 
 type Size = 'sm' | 'md' | 'lg';
-type Variant = 'brand' | 'pill'; // pill=둥근사각, 구독중=보라색
+type Variant = 'ghost' | 'pill'; // 피드: ghost / 프로필: pill
 
 export default function FollowButton({
   targetUserId,
-  size = 'md',
-  variant = 'pill',
+  size = 'sm',
+  variant = 'ghost',
   className,
 }: {
   targetUserId: string;
@@ -20,48 +19,66 @@ export default function FollowButton({
   variant?: Variant;
   className?: string;
 }) {
-  const { isFollowing, isLoading, toggle } = useFollow(targetUserId);
+  const me = typeof window !== 'undefined' ? loadUserProfile() : null;
+  const isMine = !!me && String(me.id) === String(targetUserId);
   const { open: openAuth } = useAuthModal();
 
-  const onClick = () => {
-    if (!getAccessToken()) {
-      openAuth('login');
-      return;
-    }
-    if (!isLoading) toggle();
+  if (isMine) return null;
+
+  const { isFollowing, isLoading, toggle } = useFollow(targetUserId);
+  const label = isFollowing ? '구독 중' : '구독';
+
+  const sizeCls: Record<Size, string> = {
+    sm: 'h-7 px-3 text-[12px]',
+    md: 'h-9 px-3.5 text-[13px]',
+    lg: 'h-11 px-4 text-[14px]',
   };
 
-  // 크기 (둥근 사각형)
-  const sizes: Record<Size, string> = {
-    sm: 'h-8 px-3 text-[12px] rounded-xl',
-    md: 'h-9 px-4 text-sm rounded-xl',
-    lg: 'h-10 md:h-11 px-5 text-[15px] rounded-xl',
-  };
+  // ===== 피드용(ghost): 완전 투명, 테두리+글자만 보임 =====
+  // - 기본: 흰색 테두리/글자
+  // - 구독 중: 보라색 테두리/글자
+  const ghostBase =
+    'rounded-full border bg-transparent text-white ' +
+    'border-white/80 hover:bg-transparent focus:outline-none focus:ring-2 focus:ring-white/30';
+  const ghostFollowing =
+    'rounded-full border bg-transparent ' +
+    'border-[#5a319f] text-[#5a319f] hover:bg-transparent focus:outline-none focus:ring-2 focus:ring-[#5a319f]/40';
 
-  // 색상
-  const BRAND = '#5a319f';
-  const visual =
-    variant === 'pill'
-      ? // 구독중(보라) / 미구독(중립 그레이)
-        isFollowing
-        ? `bg-[${BRAND}] hover:brightness-110 text-white border border-transparent`
-        : 'bg-white/10 hover:bg-white/16 text-white border border-white/20'
-      : // 기본 보라 버튼
-        'bg-[${BRAND}] hover:brightness-110 text-white border border-transparent';
+  // ===== 프로필용(pill): 기존 유지(연한 배경, 구독 중 보라색 배경) =====
+  const pillBase =
+    'rounded-xl border border-white/20 bg-white/10 hover:bg-white/16 text-white focus:outline-none focus:ring-2 focus:ring-white/20';
+  const pillFollowing =
+    'rounded-xl border-transparent bg-[#5a319f] hover:bg-[#5a319f]/90 text-white focus:outline-none focus:ring-2 focus:ring-[#5a319f]/40';
+
+  const variantCls =
+    variant === 'ghost'
+      ? isFollowing
+        ? ghostFollowing
+        : ghostBase
+      : isFollowing
+        ? pillFollowing
+        : pillBase;
 
   return (
     <button
       type='button'
       disabled={isLoading}
-      onClick={onClick}
-      className={clsx(
-        'inline-flex items-center justify-center font-semibold transition-colors select-none',
-        sizes[size],
-        visual,
-        className
-      )}
+      onClick={() => {
+        if (!me) {
+          openAuth('login'); // 미로그인 → 로그인 모달
+          return;
+        }
+        toggle();
+      }}
+      className={[
+        'inline-flex items-center justify-center select-none font-semibold transition-colors',
+        sizeCls[size],
+        variantCls,
+        className || '',
+      ].join(' ')}
+      aria-pressed={isFollowing}
     >
-      {isLoading ? '...' : isFollowing ? '구독중' : '구독'}
+      {label}
     </button>
   );
 }

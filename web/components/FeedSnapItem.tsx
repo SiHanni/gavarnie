@@ -273,7 +273,12 @@ export default function FeedSnapItem({
 
                 <div className='text-sm font-semibold flex items-center gap-2'>
                   {node.author.displayName}
-                  <FollowButton targetUserId={node.author.id} size='sm' />
+                  <FollowButton
+                    targetUserId={node.author.id}
+                    size='sm'
+                    variant='ghost'
+                    className='px-1.5 min-w-[55px]'
+                  />
                 </div>
               </div>
 
