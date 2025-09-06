@@ -4,7 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Comment, Media, MediaCore, User } from '@gavarnie/entities';
 import { CommentReaction } from '@gavarnie/entities';
 import { CreateCommentDto } from './dto/create-comment.dto';
@@ -39,7 +39,7 @@ export class CommentsService {
   private async mediaUuidToCoreId(mediaUuid: string): Promise<string> {
     const media = await this.mediaRepository.findOne({
       where: { id: mediaUuid },
-      relations: ['core'], // relations쓰면 core데이터까지 가져오는걸로 아는데 굳이 왜?
+      relations: ['core'],
     });
     if (!media?.core?.id) throw new BadRequestException('media not found');
     return String(media.core.id);
@@ -82,12 +82,11 @@ export class CommentsService {
   async list(q: ListArgs): Promise<ListCommentsResponseDto> {
     const limit = Math.min(Math.max(q.limit ?? 20, 1), 50);
     const mediaCoreId = await this.mediaUuidToCoreId(q.mediaId);
-
     const cursor = decodeCursor(q.cursor);
 
     const qb = this.commentRepository
       .createQueryBuilder('c')
-      .leftJoin('c.user', 'u') // 작성자 조인
+      .leftJoin('c.user', 'u')
       .where('c.media_id = :mcid', { mcid: mediaCoreId })
       .andWhere('c.parent_id ' + (q.parentId ? '= :pid' : 'IS NULL'), {
         pid: q.parentId ?? null,
@@ -99,14 +98,13 @@ export class CommentsService {
     if (cursor) {
       const ts = new Date(cursor.createdAt);
       if (isNaN(ts.getTime())) throw new BadRequestException('Invalid cursor');
-      // (createdAt > ts) OR (createdAt = ts AND id > cursor.id)
       qb.andWhere(
         '(c.created_at > :ts) OR (c.created_at = :ts AND c.id > :cid)',
         { ts, cid: cursor.id },
       );
     }
 
-    // 필요한 컬럼만 raw로 선택하여 매핑 (민감정보 배제)
+    // 필요한 컬럼만 선택 (민감정보 배제)
     qb.select([
       'c.id           AS c_id',
       'c.parent_id    AS c_parent_id',
@@ -114,9 +112,11 @@ export class CommentsService {
       'c.text         AS c_text',
       'c.created_at   AS c_created_at',
       'c.deleted_at   AS c_deleted_at',
+
       'u.id           AS u_id',
       'u.display_name AS u_display_name',
       'u.avatar_url   AS u_avatar_url',
+      'u.handle       AS u_handle', // ← handle 추가
     ]);
 
     const raw = await qb.getRawMany<{
@@ -129,19 +129,19 @@ export class CommentsService {
       u_id: string;
       u_display_name: string;
       u_avatar_url: string | null;
+      u_handle: string;
     }>();
 
     const hasNextPage = raw.length > limit;
     const pageRows = hasNextPage ? raw.slice(0, limit) : raw;
-    //const rows = await qb.getMany();
-    //const hasNextPage = rows.length > limit;
-    //const pageRows = hasNextPage ? rows.slice(0, limit) : rows;
+
+    // 페이지에 레코드가 없는 경우
+    if (pageRows.length === 0) {
+      return { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } };
+    }
 
     // 1) 이번 페이지 댓글 id 묶음
     const commentIds = pageRows.map((r) => String(r.c_id));
-    if (commentIds.length === 0) {
-      return { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } };
-    }
 
     // 2) 좋아요 집계 (is_active=1)
     const counts = await this.commentReactionRepository
@@ -168,7 +168,6 @@ export class CommentsService {
         .where('r.user_id = :uid AND r.is_active = 1', { uid: q.currentUserId })
         .andWhere('r.comment_id IN (:...ids)', { ids: commentIds })
         .getRawMany<{ commentId: string }>();
-
       likedByMeMap = new Map(liked.map((r) => [String(r.commentId), true]));
     }
 
@@ -184,6 +183,7 @@ export class CommentsService {
         id: String(r.u_id),
         displayName: r.u_display_name,
         avatarUrl: r.u_avatar_url ?? null,
+        handle: r.u_handle, // ← handle 포함
       },
       likeCount: likeCountMap.get(String(r.c_id)) ?? 0,
       ...(q.currentUserId
@@ -191,13 +191,11 @@ export class CommentsService {
         : {}),
     }));
 
-    const last = pageRows.at(-1);
-    const endCursor = last
-      ? encodeCursor({
-          createdAt: new Date(last.c_created_at).toISOString(),
-          id: String(last.c_id),
-        })
-      : null;
+    const last = pageRows.at(-1)!;
+    const endCursor = encodeCursor({
+      createdAt: new Date(last.c_created_at).toISOString(),
+      id: String(last.c_id),
+    });
 
     return { nodes, pageInfo: { hasNextPage, endCursor } };
   }
@@ -211,7 +209,7 @@ export class CommentsService {
     if (String(c.userId) !== String(requesterUserId)) {
       throw new ForbiddenException('not your comment');
     }
-    if (c.deletedAt) return { ok: true }; // idempotent
+    if (c.deletedAt) return { ok: true }; // 멱등
 
     c.deletedAt = new Date();
     await this.commentRepository.save(c);

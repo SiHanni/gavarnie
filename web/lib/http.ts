@@ -9,6 +9,7 @@ export type PublicUser = {
   avatarUrl?: string | null;
   userGrade?: UserGrade | null;
   statusMessage?: string | null;
+  // 백엔드 PublicUserDto에는 handle이 없어도 됨(라우트 파라미터로 보유)
 };
 
 // presign 응답은 서버 구현에 따라 이름이 조금 다를 수 있어 유연 처리
@@ -44,7 +45,12 @@ export type UserMediaNode = {
   contentType: string;
   size: number | null;
   createdAt: string;
-  author: { id: string; displayName: string; avatarUrl: string | null };
+  author: {
+    id: string;
+    displayName: string;
+    avatarUrl: string | null;
+    handle: string; // ← 추가
+  };
   likeCount: number;
   commentCount: number;
 };
@@ -205,8 +211,12 @@ export async function fetchProfile(): Promise<ProfileResponse> {
   }
 }
 
-export async function fetchPublicUser(id: string) {
-  return request<PublicUser>({ url: `/users/${id}`, method: 'GET' });
+/** 공개 프로필: handle 기반 */
+export async function fetchPublicUser(handle: string) {
+  return request<PublicUser>({
+    url: `/u/@${encodeURIComponent(handle)}`,
+    method: 'GET',
+  });
 }
 
 /** 내 프로필 수정 */
@@ -222,65 +232,78 @@ export async function updateMyProfile(dto: {
   });
 }
 
+/** 특정 사용자의 공개 미디어: handle 기반 */
 export async function fetchUserMedia(
-  userId: string,
+  handle: string,
   limit = 20,
   cursor?: string
 ) {
   return request<UserMediaResponse>({
-    url: `/users/${userId}/media`,
+    url: `/u/@${encodeURIComponent(handle)}/media`,
     method: 'GET',
     params: { limit, cursor },
   });
 }
 
 // ========= Media Reactions =========
+/** 서버 응답: { liked: boolean, likeCount: number } */
 export async function mediaLike(mediaUuid: string) {
-  return request<{ liked: boolean; alreadyExisted: boolean }>({
+  return request<{ liked: boolean; likeCount: number }>({
     url: `/media/${mediaUuid}/like`,
     method: 'POST',
   });
 }
 
+/** 서버 응답: { liked: boolean, likeCount: number } */
 export async function mediaUnlike(mediaUuid: string) {
-  return request<{ liked: boolean; alreadyExisted: boolean }>({
+  return request<{ liked: boolean; likeCount: number }>({
     url: `/media/${mediaUuid}/like`,
     method: 'DELETE',
   });
 }
 
+/** 서버 응답: { likeCount: number } */
 export async function mediaLikeCount(mediaUuid: string) {
-  return request<{ count: number }>({
+  return request<{ likeCount: number }>({
     url: `/media/${mediaUuid}/likes/count`,
     method: 'GET',
   });
 }
 
-export async function followUser(targetUserId: string) {
-  return request<{ following: boolean; alreadyExisted: boolean }>({
-    url: `/users/${targetUserId}/follow`,
+// ========= Follow (handle 기반) =========
+export async function followUser(targetHandle: string) {
+  return request<{ following: boolean }>({
+    url: `/u/@${encodeURIComponent(targetHandle)}/follow`,
     method: 'POST',
   });
 }
 
-export async function unfollowUser(targetUserId: string) {
-  return request<{ following: boolean; alreadyExisted: boolean }>({
-    url: `/users/${targetUserId}/follow`,
+export async function unfollowUser(targetHandle: string) {
+  return request<{ following: boolean }>({
+    url: `/u/@${encodeURIComponent(targetHandle)}/follow`,
     method: 'DELETE',
   });
 }
 
-export async function getFollowCounts(userId: string) {
+export async function getFollowCounts(handle: string) {
   return request<FollowCounts>({
-    url: `/users/${userId}/follow/counts`,
+    url: `/u/@${encodeURIComponent(handle)}/follow/counts`,
     method: 'GET',
   });
 }
 
-export async function getFollowStatus(userId: string) {
-  // (Jwt 필요) 내가 userId를 팔로우 중인지
+/** (Jwt 필요) 내가 해당 handle을 팔로우 중인지 */
+export async function getFollowStatus(handle: string) {
   return request<{ following: boolean }>({
-    url: `/users/${userId}/follow/status`,
+    url: `/u/@${encodeURIComponent(handle)}/follow/status`,
     method: 'GET',
+  });
+}
+
+// ========= My Media (soft delete) =========
+export async function deleteMyMedia(mediaUuid: string) {
+  return request<{ ok: true; deleted: boolean; id: string }>({
+    url: `/media/private/${mediaUuid}`,
+    method: 'DELETE',
   });
 }

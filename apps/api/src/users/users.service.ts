@@ -1,10 +1,11 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import {
   Comment,
@@ -19,6 +20,7 @@ import {
   UserMediaResponseDto,
   UserMediaNodeDto,
 } from './dto/user-media.dto';
+import { MEDIA_CORE_STATUS } from '../media/media.constants';
 
 function encodeCursor(v: { createdAt: string; id: string }) {
   return Buffer.from(JSON.stringify(v), 'utf8').toString('base64');
@@ -33,6 +35,36 @@ function decodeCursor(cur?: string | null) {
   } catch {
     return null;
   }
+}
+
+const RESERVED = new Set([
+  'home',
+  'about',
+  'login',
+  'logout',
+  'signup',
+  'signin',
+  'me',
+  'api',
+  'admin',
+  'catarie',
+  'cdn',
+  'static',
+  'assets',
+  'terms',
+  'privacy',
+  'help',
+]);
+
+function normalizeHandle(input: string): string {
+  let v = (input || '').toLowerCase().trim();
+  v = v.replace(/[^a-z0-9._]/g, '');
+  v = v.replace(/[._]{2,}/g, (m) => m[0]);
+  v = v.replace(/^[._]+/, '').replace(/[._]+$/, '');
+  if (v.length < 3) v = v.padEnd(3, 'x');
+  if (v.length > 30) v = v.slice(0, 30);
+  if (/^[0-9]+$/.test(v)) v = `u${v}`; // 숫자-only 방지
+  return v;
 }
 
 @Injectable()
@@ -53,13 +85,42 @@ export class UsersService {
   async create(email: string, password: string, displayName: string) {
     const exists = await this.userRepository.findOne({ where: { email } });
     if (exists) throw new ConflictException('Email already in use');
+
     const passwordHash = await bcrypt.hash(password, 12);
+    // 1차 저장
     const user = this.userRepository.create({
       email,
       passwordHash,
       displayName: displayName?.trim(),
     });
-    return this.userRepository.save(user);
+    const saved = await this.userRepository.save(user);
+
+    // 기본 핸들: user{id}
+    const base = `user${saved.id}`;
+    const candidate = await this.allocateUniqueHandle(base);
+    saved.handle = candidate;
+    await this.userRepository.save(saved);
+
+    return saved;
+  }
+
+  /** 유니크 핸들 할당(예약어/중복 회피) */
+  private async allocateUniqueHandle(seed: string): Promise<string> {
+    let base = normalizeHandle(seed);
+    if (!base || RESERVED.has(base)) base = `user${Date.now()}`;
+
+    let candidate = base;
+    let suffix = 0;
+    while (
+      (await this.userRepository.exist({ where: { handle: candidate } })) ||
+      RESERVED.has(candidate)
+    ) {
+      suffix += 1;
+      const suf = String(suffix);
+      const maxBase = Math.max(1, 30 - suf.length);
+      candidate = `${base.slice(0, maxBase)}${suf}`;
+    }
+    return candidate;
   }
 
   findByEmail(email: string) {
@@ -84,11 +145,29 @@ export class UsersService {
         'userGrade',
         'avatarUrl',
         'createdAt',
+        'handle',
       ],
     });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  async findByHandle(handle: string): Promise<User> {
+    const norm = normalizeHandle(handle);
+    const user = await this.userRepository.findOne({
+      where: { handle: norm },
+      select: [
+        'id',
+        'email',
+        'displayName',
+        'statusMessage',
+        'userGrade',
+        'avatarUrl',
+        'createdAt',
+        'handle',
+      ],
+    });
+    if (!user) throw new NotFoundException('User not found');
     return user;
   }
 
@@ -111,6 +190,22 @@ export class UsersService {
       u.statusMessage = v.length > 0 ? v.slice(0, 50) : null;
     }
 
+    // @handle 변경 (선택적)
+    if (typeof dto.handle === 'string' && dto.handle.trim().length > 0) {
+      const norm = normalizeHandle(dto.handle);
+      if (RESERVED.has(norm))
+        throw new BadRequestException('handle is reserved');
+
+      const dup = await this.userRepository.findOne({
+        where: { handle: norm, id: Not(userId as any) },
+        select: ['id'],
+      });
+      if (dup) throw new ConflictException('handle already in use');
+
+      u.handle = norm;
+      // (선택) 핸들 변경 쿨다운/이력 테이블은 추후 확장 가능
+    }
+
     await this.userRepository.save(u);
 
     return {
@@ -119,29 +214,28 @@ export class UsersService {
       displayName: u.displayName,
       avatarUrl: u.avatarUrl ?? null,
       statusMessage: u.statusMessage ?? null,
+      handle: u.handle,
     };
   }
 
   /** 공개 프로필 */
-  async getPublicProfile(targetUserId: string) {
-    const user = await this.userRepository.findOne({
-      where: { id: targetUserId },
-    });
-    if (!user) throw new NotFoundException('User not found');
+  async getPublicProfileByHandle(handle: string) {
+    const user = await this.findByHandle(handle);
     return {
       id: String(user.id),
       displayName: user.displayName,
       avatarUrl: user.avatarUrl ?? null,
       statusMessage: user.statusMessage,
+      handle: user.handle,
     };
   }
 
   /** 특정 사용자읭 공개 미디어 (READY) */
-  async getUserMedia(
+  private async getUserMediaByOwnerId(
     ownerId: string,
     dto: UserMediaQueryDto,
   ): Promise<UserMediaResponseDto> {
-    const limit = dto.limit ?? 20;
+    const limit = Math.min(Math.max(dto.limit ?? 20, 1), 50);
     const cursor = decodeCursor(dto.cursor);
 
     const qb = this.mediaRepository
@@ -151,6 +245,11 @@ export class UsersService {
       .where('media.status = :ready', { ready: 'READY' })
       .andWhere('media.hlsKey IS NOT NULL')
       .andWhere('core.owner_id = :oid', { oid: ownerId })
+      .andWhere('core.status = :status', {
+        status: MEDIA_CORE_STATUS.PUBLISHED,
+      })
+      .andWhere('media.deleted_at IS NULL')
+      .andWhere('core.deleted_at IS NULL')
       .orderBy('media.createdAt', 'DESC')
       .addOrderBy('media.id', 'DESC')
       .limit(limit + 1)
@@ -173,6 +272,7 @@ export class UsersService {
         'owner.id                 AS owner_id',
         'owner.display_name       AS owner_display_name',
         'owner.avatar_url         AS owner_avatar_url',
+        'owner.handle             AS owner_handle',
       ]);
 
     if (cursor) {
@@ -198,9 +298,11 @@ export class UsersService {
 
       mc_id: string;
       mc_title: string;
+
       owner_id: string;
       owner_display_name: string;
       owner_avatar_url: string | null;
+      owner_handle: string;
     }>();
 
     const hasNextPage = raw.length > limit;
@@ -244,6 +346,7 @@ export class UsersService {
         id: String(r.owner_id),
         displayName: r.owner_display_name,
         avatarUrl: r.owner_avatar_url ?? null,
+        handle: r.owner_handle,
       },
       likeCount: likeMap.get(String(r.mc_id)) ?? 0,
       commentCount: cmtMap.get(String(r.mc_id)) ?? 0,
@@ -260,5 +363,14 @@ export class UsersService {
     });
 
     return { nodes, pageInfo: { hasNextPage, endCursor } };
+  }
+
+  /** 특정 사용자의 공개 미디어 (READY) — by handle */
+  async getUserMediaByHandle(
+    handle: string,
+    dto: UserMediaQueryDto,
+  ): Promise<UserMediaResponseDto> {
+    const user = await this.findByHandle(handle);
+    return this.getUserMediaByOwnerId(String(user.id), dto);
   }
 }

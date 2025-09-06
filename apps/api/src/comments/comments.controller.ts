@@ -33,14 +33,17 @@ export class CommentsController {
 
   @Get()
   @ApiOperation({
-    summary: '댓글(대댓글) 목록, 커서 페이지 네이션 적용, 댓글(대댓글) 따로',
+    summary:
+      '댓글(대댓글) 목록, 커서 페이지 네이션 적용, 댓글/대댓글 분리 조회',
   })
-  async list(@Query() q: ListCommentsQueryDto) {
+  async list(@Req() req: any, @Query() q: ListCommentsQueryDto) {
     return this.svc.list({
       mediaId: q.mediaId,
       parentId: q.parentId,
       limit: q.limit ?? 20,
       cursor: q.cursor,
+      // 로그인 사용자인 경우에만 likedByMe 계산에 사용
+      currentUserId: req.user?.userId,
     });
   }
 

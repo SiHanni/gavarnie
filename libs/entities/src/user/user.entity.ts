@@ -1,16 +1,20 @@
+import { MediaCore } from '../media/media-core.entity';
 import {
+  Entity,
+  Unique,
+  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  Entity,
   OneToMany,
-  PrimaryGeneratedColumn,
-  Unique,
 } from 'typeorm';
-import { MediaCore } from '../media/media-core.entity';
 
 export type UserGrade = 'basic' | 'plus' | 'premium';
+
 @Entity('users')
+// 기존 이메일 고유 제약 유지
 @Unique(['email'])
+// 핸들 고유 제약 추가 (이름을 명시하고 싶으면 @Unique('uq_users_handle', ['handle']))
+@Unique(['handle'])
 export class User {
   // BIGINT AUTO_INCREMENT → JS 정밀도 이슈 회피 위해 string 사용
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -25,8 +29,25 @@ export class User {
   @Column({ name: 'display_name', type: 'varchar', length: 100 })
   displayName!: string;
 
-  @Column({ name: 'status_message', type: 'varchar', length: 100 })
+  // 마이그레이션과 일치: NULL 허용
+  @Column({
+    name: 'status_message',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   statusMessage!: string | null;
+
+  // 새로 추가된 @handle (NOT NULL, 30자, 대소문자/악센트 비구분 콜레이션)
+  // 주: MySQL 8 이상에서 'utf8mb4_0900_ai_ci' 사용 가능
+  @Column({
+    name: 'handle',
+    type: 'varchar',
+    length: 30,
+    nullable: false,
+    collation: 'utf8mb4_0900_ai_ci',
+  })
+  handle!: string;
 
   @Column({
     name: 'user_grade',

@@ -52,6 +52,9 @@ export class MediaCore {
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt!: Date;
 
+  @Column({ name: 'deleted_at', type: 'datetime', nullable: true })
+  deletedAt!: Date | null;
+
   @OneToOne(() => Media, m => m.core, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'media_id', referencedColumnName: 'id' })
   media!: Media;

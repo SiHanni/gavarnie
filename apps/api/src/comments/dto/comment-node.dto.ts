@@ -1,4 +1,3 @@
-// apps/api/src/comments/dto/comment-node.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CommentAuthorDto {
@@ -10,6 +9,10 @@ export class CommentAuthorDto {
 
   @ApiProperty({ example: 'https://.../avatar.png', nullable: true })
   avatarUrl!: string | null;
+
+  /** 프로필 링크를 /@handle 로 바로 만들 수 있도록 포함 */
+  @ApiProperty({ example: 'iammingki' })
+  handle!: string;
 }
 
 export class CommentNodeDto {

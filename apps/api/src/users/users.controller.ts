@@ -37,28 +37,29 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @Patch('me')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: '내 프로필 수정' })
+  @ApiOperation({ summary: '내 프로필 수정(@handle 변경 포함)' })
   async updateProfile(@Req() req: any, @Body() dto: UpdateProfileDto) {
     return this.users.updateMe(req.user.userId as string, dto);
   }
 
-  // --- 공개 프로필 + 공개 미디어 ---
-  @Get(':id')
-  @ApiOperation({ summary: '공개 프로필 조회' })
+  @Get('handle/:handle')
+  @ApiOperation({ summary: '공개 프로필 조회 (by handle)' })
   @ApiOkResponse({ type: PublicUserDto })
-  async publicProfile(@Param('id') id: string): Promise<PublicUserDto> {
-    return this.users.getPublicProfile(id);
+  async publicProfileByHandle(
+    @Param('handle') handle: string,
+  ): Promise<PublicUserDto> {
+    return this.users.getPublicProfileByHandle(handle);
   }
 
-  @Get(':id/media')
+  @Get('handle/:handle/media')
   @ApiOperation({
-    summary: '특정 사용자의 공개 미디어 목록(커서 페이지네이션)',
+    summary: '특정 사용자의 공개 미디어 목록(커서 페이지네이션, by handle)',
   })
   @ApiOkResponse({ type: UserMediaResponseDto })
-  async userMedia(
-    @Param('id') id: string,
+  async userMediaByHandle(
+    @Param('handle') handle: string,
     @Query() q: UserMediaQueryDto,
   ): Promise<UserMediaResponseDto> {
-    return this.users.getUserMedia(id, q);
+    return this.users.getUserMediaByHandle(handle, q);
   }
 }
