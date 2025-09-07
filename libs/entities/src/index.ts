@@ -7,3 +7,5 @@ export * from './media/comment-reaction.entity';
 
 export * from './user/user.entity';
 export * from './user/user-follows.entity';
+
+export * from './user/avatar-change.entity';

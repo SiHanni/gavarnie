@@ -19,6 +19,7 @@ import { MediaReactionModule } from './media-reaction/media-reaction.module';
 import { CommentsModule } from './comments/comments.module';
 import { CommentReactionsModule } from './comments-reactions/comment-reactions.module';
 import { UserFollowsModule } from './user-follows/follow.module';
+import { AvatarsModule } from './avatars/avatars.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { UserFollowsModule } from './user-follows/follow.module';
     CommentsModule,
     CommentReactionsModule,
     UserFollowsModule,
+    AvatarsModule,
   ],
 })
 export class AppModule {}

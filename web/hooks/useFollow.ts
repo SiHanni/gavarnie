@@ -1,28 +1,29 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { followUser, unfollowUser, getFollowStatus } from '@/lib/http';
-import { getAccessToken } from '@/lib/http'; // ⬅️ 추가
+import {
+  followUser,
+  unfollowUser,
+  getFollowStatus,
+  getAccessToken,
+} from '@/lib/http';
 
-export function useFollow(
-  targetUserId: string,
-  opts?: { enabled?: boolean } // ⬅️ 로그인 여부로 enable 제어
-) {
+export function useFollow(targetHandle: string, opts?: { enabled?: boolean }) {
   const qc = useQueryClient();
-  const qKey = ['isFollowing', targetUserId];
+  const qKey = ['isFollowing', targetHandle];
 
-  const enabled = opts?.enabled ?? !!getAccessToken(); // ⬅️ 기본: 토큰 있을 때만
+  const enabled = opts?.enabled ?? (!!getAccessToken() && !!targetHandle);
 
   const q = useQuery({
     queryKey: qKey,
-    queryFn: () => getFollowStatus(targetUserId),
-    enabled, // ⬅️ 중요: 로그아웃이면 요청 안 함
+    queryFn: () => getFollowStatus(targetHandle),
+    enabled,
     staleTime: 30_000,
   });
 
   const mut = useMutation({
     mutationFn: async (now: boolean) => {
-      return now ? unfollowUser(targetUserId) : followUser(targetUserId);
+      return now ? unfollowUser(targetHandle) : followUser(targetHandle);
     },
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: qKey });
@@ -37,7 +38,7 @@ export function useFollow(
   });
 
   return {
-    isFollowing: !!q.data?.following, // 로그아웃이면 false
+    isFollowing: !!q.data?.following,
     isLoading: (enabled && q.isLoading) || mut.isPending,
     toggle: () => mut.mutate(!!q.data?.following),
   };

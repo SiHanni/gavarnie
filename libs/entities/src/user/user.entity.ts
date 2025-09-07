@@ -60,6 +60,12 @@ export class User {
   @Column({ name: 'avatar_url', type: 'varchar', length: 500, nullable: true })
   avatarUrl?: string | null;
 
+  @Column({ name: 'avatar_cooldown_until', type: 'timestamp', nullable: true })
+  avatarCooldownUntil?: Date | null;
+
+  @Column({ name: 'avatar_updated_at', type: 'timestamp', nullable: true })
+  avatarUpdatedAt?: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt!: Date;
 

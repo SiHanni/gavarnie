@@ -13,6 +13,7 @@ import { S3Module } from '../storage/s3.module';
 import { S3Service } from '../storage/s3.service';
 import { QueueModule } from '../queue/queue.module';
 import { PublicMediaController } from './public/public-media.controller';
+import { PrivateMediaController } from './private/private.controller';
 
 @Module({
   imports: [
@@ -21,7 +22,11 @@ import { PublicMediaController } from './public/public-media.controller';
     QueueModule,
   ],
   providers: [MediaService, S3Service],
-  controllers: [UploadsController, PublicMediaController],
+  controllers: [
+    UploadsController,
+    PublicMediaController,
+    PrivateMediaController,
+  ],
   exports: [MediaService],
 })
 export class MediaModule {}

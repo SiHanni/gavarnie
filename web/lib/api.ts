@@ -7,7 +7,6 @@ export const api = axios.create({
   withCredentials: false, // 현재는 헤더 토큰 방식 가정
 });
 
-// (선택) AccessToken 보관. 로그인 붙일 때 사용 예정.
 let accessToken: string | null = null;
 export const setAccessToken = (t: string | null) => {
   accessToken = t;

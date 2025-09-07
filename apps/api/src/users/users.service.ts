@@ -21,6 +21,7 @@ import {
   UserMediaNodeDto,
 } from './dto/user-media.dto';
 import { MEDIA_CORE_STATUS } from '../media/media.constants';
+import { randomBytes } from 'node:crypto';
 
 function encodeCursor(v: { createdAt: string; id: string }) {
   return Buffer.from(JSON.stringify(v), 'utf8').toString('base64');
@@ -87,21 +88,22 @@ export class UsersService {
     if (exists) throw new ConflictException('Email already in use');
 
     const passwordHash = await bcrypt.hash(password, 12);
-    // 1차 저장
+
+    // handle 값 생성
+    const basePart = email.split('@')[0].slice(0, 10);
+    const rand = randomBytes(3).toString('base64url'); // 예: "a9Xf"
+    const base = `${basePart}_${rand}`;
+    // allocateUniqueHandle로 중복 보정
+    const candidate = await this.allocateUniqueHandle(base);
+
     const user = this.userRepository.create({
       email,
       passwordHash,
       displayName: displayName?.trim(),
+      handle: candidate,
     });
-    const saved = await this.userRepository.save(user);
 
-    // 기본 핸들: user{id}
-    const base = `user${saved.id}`;
-    const candidate = await this.allocateUniqueHandle(base);
-    saved.handle = candidate;
-    await this.userRepository.save(saved);
-
-    return saved;
+    return this.userRepository.save(user);
   }
 
   /** 유니크 핸들 할당(예약어/중복 회피) */
