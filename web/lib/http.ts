@@ -9,10 +9,10 @@ export type PublicUser = {
   avatarUrl?: string | null;
   userGrade?: UserGrade | null;
   statusMessage?: string | null;
-  // 백엔드 PublicUserDto에는 handle이 없어도 됨(라우트 파라미터로 보유)
+  handle?: string | null;
 };
 
-// presign 응답은 서버 구현에 따라 이름이 조금 다를 수 있어 유연 처리
+/** presign (서버마다 키 다를 수 있음) */
 export type Presign =
   | {
       url: string;
@@ -27,18 +27,19 @@ export type Presign =
       mediaId: string;
     };
 
-// ===== 프로필 =====
+/** 내 프로필 */
 export type ProfileResponse = {
   id: string;
   email: string;
   displayName: string;
   statusMessage: string | null;
   avatarUrl: string | null;
+  handle?: string | null;
 };
 
-/** 특정 사용자의 공개 미디어 */
+/** 유저 미디어 */
 export type UserMediaNode = {
-  id: string;
+  id: string; // media UUID
   hlsKey: string;
   originalFilename: string;
   title: string;
@@ -49,7 +50,7 @@ export type UserMediaNode = {
     id: string;
     displayName: string;
     avatarUrl: string | null;
-    handle: string; // ← 추가
+    handle: string; // 서버가 내려줘야 함
   };
   likeCount: number;
   commentCount: number;
@@ -64,14 +65,14 @@ export type FollowCounts = {
   followingCount: number;
 };
 
-// Axios 인스턴스
+// ===== Axios =====
 export const http = axios.create({
-  baseURL: ENV.API,
+  baseURL: ENV.API, // 예: 'http://localhost:3000'
   headers: { 'Content-Type': 'application/json' },
-  withCredentials: false, // 헤더 토큰 방식
+  withCredentials: false,
 });
 
-// 토큰 보관/복구
+// ===== 토큰 =====
 const KEY = 'accessToken';
 let accessToken: string | null = null;
 
@@ -80,31 +81,25 @@ export const setAccessToken = (t: string | null) => {
 };
 export const getAccessToken = () => accessToken;
 
-/** 새로 고침을 했을 때 localStorage에서 토큰을 가져오는 함수 */
 export function initAuthFromStorage() {
   if (typeof window === 'undefined') return;
   const t = localStorage.getItem(KEY);
   if (t) setAccessToken(t);
 }
-
 export function storeToken(t: string) {
   if (typeof window !== 'undefined') localStorage.setItem(KEY, t);
   setAccessToken(t);
 }
-
 export function clearToken() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(KEY);
   setAccessToken(null);
 }
-
-// 모듈이 로드되는 순간에 동기 복구 (가장 중요)
 if (typeof window !== 'undefined') {
   const t = localStorage.getItem(KEY);
   if (t) setAccessToken(t);
 }
 
-// 요청: 토큰 주입
 http.interceptors.request.use(cfg => {
   if (accessToken) {
     cfg.headers = cfg.headers ?? {};
@@ -112,14 +107,11 @@ http.interceptors.request.use(cfg => {
   }
   return cfg;
 });
-
-// 응답: 401 → 로그인 모달 오픈 이벤트
 http.interceptors.response.use(
   r => r,
   err => {
     const status = err?.response?.status;
     if (typeof window !== 'undefined' && status === 401) {
-      // 토큰이 진짜 만료/무효일 때만 로그아웃 처리
       clearToken();
       window.dispatchEvent(new CustomEvent('auth:required'));
     }
@@ -127,13 +119,13 @@ http.interceptors.response.use(
   }
 );
 
-// data 만 반환하는 헬퍼
+// data 헬퍼
 export async function request<T = any>(config: AxiosRequestConfig): Promise<T> {
   const res = await http.request<T>(config);
   return res.data as T;
 }
 
-// ===== API 래핑 (로그인/회원가입/업로드) =====
+// ===== Auth =====
 export async function login(email: string, password: string) {
   return request<{ accessToken: string }>({
     url: '/auth/login',
@@ -153,7 +145,7 @@ export async function signUp(
   });
 }
 
-/** 영상 원본 업로드를 위한 presing URL 발급 요청 API */
+/** presign */
 export async function presignUpload(
   originalFilename: string,
   contentType?: string,
@@ -168,10 +160,7 @@ export async function presignUpload(
   });
 }
 
-/**
- * 영상 원본 업로드 후 호출
- * - size는 보내지 않아도 서버에서 처리하긴함
- * */
+/** 업로드 완료 */
 export async function completeUpload(
   mediaId: string,
   key: string,
@@ -193,13 +182,13 @@ export async function getMediaStatus(id: string) {
   });
 }
 
-// 1) 토큰 존재 여부(초기 렌더에서 깜빡임 방지용)
+// 토큰 존재 확인
 export function hasStoredToken(): boolean {
   if (typeof window === 'undefined') return false;
   return !!localStorage.getItem(KEY);
 }
 
-/** 내 프로필 (우선 /users/profile, 실패 시 /auth/profile 폴백) */
+/** 내 프로필 */
 export async function fetchProfile(): Promise<ProfileResponse> {
   try {
     return await request<ProfileResponse>({
@@ -211,11 +200,26 @@ export async function fetchProfile(): Promise<ProfileResponse> {
   }
 }
 
-/** 공개 프로필: handle 기반 */
+/* ===== handle 유틸 (@ 제거) ===== */
+const stripAt = (v: string) => (v.startsWith('@') ? v.slice(1) : v);
+
+/** 공개 프로필 (by handle) */
 export async function fetchPublicUser(handle: string) {
-  return request<PublicUser>({
-    url: `/u/@${encodeURIComponent(handle)}`,
+  const h = encodeURIComponent(stripAt(handle));
+  return request<PublicUser>({ url: `/users/handle/${h}`, method: 'GET' });
+}
+
+/** 유저 공개 미디어 (by handle) */
+export async function fetchUserMedia(
+  handle: string,
+  limit = 20,
+  cursor?: string
+) {
+  const h = encodeURIComponent(stripAt(handle));
+  return request<UserMediaResponse>({
+    url: `/users/handle/${h}/media`,
     method: 'GET',
+    params: { limit, cursor },
   });
 }
 
@@ -232,70 +236,52 @@ export async function updateMyProfile(dto: {
   });
 }
 
-/** 특정 사용자의 공개 미디어: handle 기반 */
-export async function fetchUserMedia(
-  handle: string,
-  limit = 20,
-  cursor?: string
-) {
-  return request<UserMediaResponse>({
-    url: `/u/@${encodeURIComponent(handle)}/media`,
-    method: 'GET',
-    params: { limit, cursor },
-  });
-}
-
 // ========= Media Reactions =========
-/** 서버 응답: { liked: boolean, likeCount: number } */
 export async function mediaLike(mediaUuid: string) {
-  return request<{ liked: boolean; likeCount: number }>({
+  return request<{ liked: boolean; alreadyExisted?: boolean }>({
     url: `/media/${mediaUuid}/like`,
     method: 'POST',
   });
 }
-
-/** 서버 응답: { liked: boolean, likeCount: number } */
 export async function mediaUnlike(mediaUuid: string) {
-  return request<{ liked: boolean; likeCount: number }>({
+  return request<{ liked: boolean; alreadyExisted?: boolean }>({
     url: `/media/${mediaUuid}/like`,
     method: 'DELETE',
   });
 }
-
-/** 서버 응답: { likeCount: number } */
 export async function mediaLikeCount(mediaUuid: string) {
-  return request<{ likeCount: number }>({
+  return request<{ count: number }>({
     url: `/media/${mediaUuid}/likes/count`,
     method: 'GET',
   });
 }
 
-// ========= Follow (handle 기반) =========
+// ========= Follow (모두 handle 기준) =========
 export async function followUser(targetHandle: string) {
+  const h = encodeURIComponent(stripAt(targetHandle));
   return request<{ following: boolean }>({
-    url: `/u/@${encodeURIComponent(targetHandle)}/follow`,
+    url: `/users/handle/${h}/follow`,
     method: 'POST',
   });
 }
-
 export async function unfollowUser(targetHandle: string) {
+  const h = encodeURIComponent(stripAt(targetHandle));
   return request<{ following: boolean }>({
-    url: `/u/@${encodeURIComponent(targetHandle)}/follow`,
+    url: `/users/handle/${h}/follow`,
     method: 'DELETE',
   });
 }
-
 export async function getFollowCounts(handle: string) {
+  const h = encodeURIComponent(stripAt(handle));
   return request<FollowCounts>({
-    url: `/u/@${encodeURIComponent(handle)}/follow/counts`,
+    url: `/users/handle/${h}/follow/counts`,
     method: 'GET',
   });
 }
-
-/** (Jwt 필요) 내가 해당 handle을 팔로우 중인지 */
 export async function getFollowStatus(handle: string) {
+  const h = encodeURIComponent(stripAt(handle));
   return request<{ following: boolean }>({
-    url: `/u/@${encodeURIComponent(handle)}/follow/status`,
+    url: `/users/handle/${h}/follow/status`,
     method: 'GET',
   });
 }
@@ -305,5 +291,34 @@ export async function deleteMyMedia(mediaUuid: string) {
   return request<{ ok: true; deleted: boolean; id: string }>({
     url: `/media/private/${mediaUuid}`,
     method: 'DELETE',
+  });
+}
+
+// --- 아바타 업로드 Presign ---
+export async function avatarsPresign(input: {
+  contentType?: string;
+  fileSize?: number;
+  originalFilename?: string;
+}) {
+  return request<{
+    url: string;
+    method: 'PUT';
+    headers: Record<string, string>;
+    key: string;
+    expiresIn: number;
+    publicUrl: string | null;
+  }>({
+    url: '/avatars/presign',
+    method: 'POST',
+    data: input,
+  });
+}
+
+// --- 아바타 업로드 완료 ---
+export async function avatarsComplete(key: string) {
+  return request<{ ok: true; avatarUrl: string; variants?: string[] }>({
+    url: '/avatars/complete',
+    method: 'POST',
+    data: { key },
   });
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUploadModal } from '@/contexts/UploadModalContext';
 import { useAuthModal } from '@/contexts/AuthModalContext';
 import {
@@ -32,13 +32,15 @@ type Props = {
   logoHeight?: number;
   paddingTop?: number;
   paddingLeft?: number;
-  compactAt?: number; // 축소 레일로
-  mobileAt?: number; // 바텀탭으로
+  compactAt?: number;
+  mobileAt?: number;
 };
 
 const ICON_SIZE = 28;
 const COMPACT_WIDTH = 72;
 const COMPACT_ICON = 28;
+
+const COMPANY_INFO_TEXT = 'Catarie(SH)';
 
 export default function LeftSidebar({
   width = 260,
@@ -48,7 +50,7 @@ export default function LeftSidebar({
   paddingTop = 20,
   paddingLeft = 20,
   compactAt = 1080,
-  mobileAt = 560, // iPhone Max 이하
+  mobileAt = 560,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -66,9 +68,22 @@ export default function LeftSidebar({
     typeof window !== 'undefined' ? loadUserProfile() : null
   );
 
-  // 창 크기에 따라 축소 여부
   const [isCompact, setIsCompact] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  const [companyOpen, setCompanyOpen] = useState(false);
+  const companyPanelRef = useRef<HTMLDivElement | null>(null);
+  const [companyPanelH, setCompanyPanelH] = useState(0);
+
+  useEffect(() => {
+    const measure = () => {
+      setCompanyPanelH(companyPanelRef.current?.scrollHeight ?? 0);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    if (companyOpen) setTimeout(measure, 0);
+    return () => window.removeEventListener('resize', measure);
+  }, [companyOpen]);
 
   useEffect(() => {
     const apply = () => {
@@ -88,16 +103,25 @@ export default function LeftSidebar({
     if (hasToken && !me) {
       fetchProfile()
         .then(p => {
-          saveUserProfile(p);
-          setMe(p);
+          const normalized: UserProfile = {
+            ...p,
+            handle: p.handle ?? undefined,
+          };
+          saveUserProfile(normalized);
+          setMe(normalized);
         })
         .catch(() => {});
     }
 
     const onLogin = (e: Event) => {
       const p = (e as CustomEvent).detail as UserProfile | undefined;
-      if (p) saveUserProfile(p);
-      setMe(p || loadUserProfile());
+      if (p) {
+        const normalized: UserProfile = { ...p, handle: p.handle ?? undefined };
+        saveUserProfile(normalized);
+        setMe(normalized);
+      } else {
+        setMe(loadUserProfile());
+      }
       setHasToken(true);
     };
     const onLogout = () => {
@@ -112,7 +136,6 @@ export default function LeftSidebar({
     };
   }, [hasToken, me]);
 
-  // 사이드바 상태가 바뀔 때 콘텐츠에게 재측정 알림
   useEffect(() => {
     if (!mounted) return;
     window.dispatchEvent(new CustomEvent('sidebar:changed'));
@@ -130,7 +153,9 @@ export default function LeftSidebar({
 
   const goProfile = () => {
     if (!loggedIn) return openAuth('login');
-    router.push(`/users/${me!.id}`);
+    const h = me?.handle;
+    if (h && h.trim()) router.push(`/@${h}`);
+    else router.push('/settings/profile');
   };
 
   const doUpload = () => {
@@ -148,7 +173,6 @@ export default function LeftSidebar({
 
   if (!mounted) return null;
 
-  // ── Mobile: Bottom Tabbar ─────────────────────────────────
   if (isMobile) {
     return (
       <BottomTabBar
@@ -160,7 +184,6 @@ export default function LeftSidebar({
     );
   }
 
-  // ── Compact left rail ─────────────────────────────────────
   if (isCompact) {
     return (
       <CompactRail
@@ -175,7 +198,6 @@ export default function LeftSidebar({
     );
   }
 
-  // ── Full sidebar (desktop) ────────────────────────────────
   return (
     <aside
       id='left-sidebar'
@@ -187,6 +209,7 @@ export default function LeftSidebar({
         className='flex flex-col h-full'
         style={{ paddingTop, paddingLeft, paddingRight: 12 }}
       >
+        {/* 로고 */}
         <button
           type='button'
           onClick={goHome}
@@ -211,6 +234,7 @@ export default function LeftSidebar({
           />
         </button>
 
+        {/* 메뉴 */}
         <nav className='mt-6 flex flex-col gap-2 text-[15px]'>
           <SideItem
             label='홈'
@@ -248,18 +272,42 @@ export default function LeftSidebar({
           )}
         </nav>
 
+        {/* 메뉴 구분선 이후에 고정: 회사/약관/뱃지 */}
         <div className='mt-6 mx-3 border-t border-white/10' />
-        <div className='px-3 pt-4 pb-2 text-[13px] text-white/60 space-y-2'>
-          <div className='hover:text-white transition-colors'>
-            <Link href='/about'>회사</Link>
-          </div>
-          <div className='hover:text-white transition-colors'>
-            <Link href='/terms'>약관 및 정책</Link>
-          </div>
-        </div>
 
-        {loggedIn && (
-          <div className='mt-auto mb-40 mr-3'>
+        <div className='px-3 pt-4 pb-4 flex flex-col gap-4'>
+          {/* 회사/약관 */}
+          <div className='text-[13px] text-white/60 space-y-2'>
+            <button
+              type='button'
+              aria-expanded={companyOpen}
+              onClick={() => setCompanyOpen(o => !o)}
+              className='w-full text-left hover:text-white transition-colors inline-flex items-center'
+            >
+              회사
+            </button>
+
+            <div
+              className='overflow-hidden transition-[max-height,opacity] duration-300'
+              style={{
+                maxHeight: companyOpen ? companyPanelH : 0,
+                opacity: companyOpen ? 1 : 0,
+              }}
+            >
+              <div ref={companyPanelRef} className='pl-1 pr-2 py-2'>
+                <p className='text-white/60 leading-relaxed'>
+                  {COMPANY_INFO_TEXT}
+                </p>
+              </div>
+            </div>
+
+            <div className='hover:text-white transition-colors'>
+              <Link href='/terms'>약관 및 정책</Link>
+            </div>
+          </div>
+
+          {/* 프로필 뱃지 */}
+          {loggedIn && (
             <button
               type='button'
               onClick={goProfile}
@@ -291,12 +339,6 @@ export default function LeftSidebar({
                       backgroundColor: 'rgba(90,49,159,0.15)',
                       borderColor: 'rgba(90,49,159,0.35)',
                     }}
-                    title={`회원 등급: ${
-                      GRADE_LABEL[
-                        (me!.userGrade as 'basic' | 'plus' | 'premium') ||
-                          'basic'
-                      ]
-                    }`}
                   >
                     {
                       GRADE_LABEL[
@@ -306,20 +348,18 @@ export default function LeftSidebar({
                     }
                   </span>
                 )}
-                <div
-                  className='mt-1 ml-2 text-white/90 text-[15px] leading-tight break-words line-clamp-2'
-                  title={me!.displayName || me!.email}
-                >
+                <div className='mt-1 ml-2 text-white/90 text-[15px] leading-tight break-words line-clamp-2'>
                   {me!.displayName || me!.email}
                 </div>
               </div>
             </button>
+          )}
 
-            <div className='px-3 pt-1 text-[12px] text-white/40 mt-auto mb-3'>
-              © {new Date().getFullYear()} Catarie
-            </div>
+          {/* 카피라이트 */}
+          <div className='text-[12px] text-white/40'>
+            © {new Date().getFullYear()} Catarie
           </div>
-        )}
+        </div>
       </div>
     </aside>
   );
@@ -358,15 +398,7 @@ function CompactRail({
           title='홈'
           className='grid place-items-center w-12 h-12 rounded-xl hover:bg-white/10 transition-colors'
         >
-          <img
-            src='/images/favicon.png'
-            alt='Catarie'
-            width={24}
-            height={24}
-            className='w-9 h-9'
-            draggable={false}
-            decoding='async'
-          />
+          <img src='/images/favicon.png' alt='Catarie' className='w-9 h-9' />
         </button>
 
         <nav className='mt-2 flex flex-col items-center gap-2'>
@@ -426,29 +458,26 @@ function BottomTabBar({
       id='bottom-tabbar'
       className='fixed bottom-0 inset-x-0 z-[90] bg-black/70 backdrop-blur-md border-t border-white/10'
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      aria-label='하단 내비게이션'
     >
       <ul className='mx-auto max-w-[680px] h-14 px-10 flex items-center justify-between'>
         <Tab
           icon='/images/mobile_home.png'
-          label=''
           active={activePathname === '/'}
           onClick={onHome}
         />
-        <Tab icon='/images/mobile_upload.png' label='' onClick={onUpload} />
-        <Tab icon='/images/mobile_profile.png' label='' onClick={onProfile} />
+        <Tab icon='/images/mobile_upload.png' onClick={onUpload} />
+        <Tab icon='/images/mobile_profile.png' onClick={onProfile} />
       </ul>
     </nav>
   );
 }
+
 function Tab({
   icon,
-  label,
   onClick,
   active,
 }: {
   icon: string;
-  label: string;
   onClick: () => void;
   active?: boolean;
 }) {
@@ -456,12 +485,9 @@ function Tab({
     <button
       type='button'
       onClick={onClick}
-      className={`flex flex-col items-center gap-1 px-3 py-1 rounded-md ${
-        active ? 'text-white' : 'text-white/80'
-      }`}
+      className={`flex flex-col items-center gap-1 px-3 py-1 rounded-md ${active ? 'text-white' : 'text-white/80'}`}
     >
       <img src={icon} alt='' className='w-6 h-6' />
-      <span className='text-[11px]'>{label}</span>
     </button>
   );
 }
@@ -485,25 +511,11 @@ function SideItem({
       type='button'
       onClick={onClick}
       className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors
-        ${
-          active
-            ? 'bg-white/15 border-white/15'
-            : 'hover:bg-white/10 hover:border-white/10 border-transparent'
-        }`}
+        ${active ? 'bg-white/15 border-white/15' : 'hover:bg-white/10 hover:border-white/10 border-transparent'}`}
     >
       <span className='inline-flex items-center gap-3'>
         {iconSrc && (
-          <img
-            src={iconSrc}
-            alt=''
-            width={iconSize}
-            height={iconSize}
-            style={{ width: iconSize, height: iconSize }}
-            className='inline-block align-[-2px]'
-            draggable={false}
-            decoding='async'
-            loading='lazy'
-          />
+          <img src={iconSrc} alt='' width={iconSize} height={iconSize} />
         )}
         {label}
       </span>
@@ -529,20 +541,10 @@ function IconOnly({
       type='button'
       onClick={onClick}
       title={label}
-      aria-label={label}
       className={`group relative grid place-items-center w-12 h-12 rounded-xl transition-colors
         ${active ? 'bg-white/15' : 'hover:bg-white/10'}`}
     >
-      <img
-        src={src}
-        alt=''
-        width={size}
-        height={size}
-        className='w-7 h-7'
-        draggable={false}
-        decoding='async'
-        loading='lazy'
-      />
+      <img src={src} alt='' width={size} height={size} className='w-7 h-7' />
       <span
         className='pointer-events-none absolute left-[110%] top-1/2 -translate-y-1/2
                    opacity-0 group-hover:opacity-100 transition-opacity text-[11px]

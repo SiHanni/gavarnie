@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // 필요하면 여기서 images.domains 등 추가
+
+  async rewrites() {
+    return [
+      // 브라우저 URL: /@handle  →  파일 라우트: /u/handle
+      { source: '/@:handle', destination: '/u/:handle' },
+    ];
+  },
 };
+
 export default nextConfig;

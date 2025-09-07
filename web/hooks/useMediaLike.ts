@@ -37,13 +37,13 @@ export function useMediaLike(mediaUuid: string) {
     queryKey: ['media-like-count', mediaUuid],
     queryFn: async () => {
       const r = await mediaLikeCount(mediaUuid);
-      return r.count;
+      return r.count; // ✅ 서버 응답 필드: count
     },
     staleTime: 10_000,
   });
 
   // 내가 좋아요 했는지(로컬 세션 기반)
-  const liked = useMemo(() => readSet().has(mediaUuid), [mediaUuid, count]); // count 변동 시 재계산
+  const liked = useMemo(() => readSet().has(mediaUuid), [mediaUuid, count]);
 
   const toggle = useCallback(async () => {
     if (!getAccessToken()) {

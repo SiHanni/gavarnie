@@ -3,10 +3,15 @@
 set -e
 
 mc alias set local http://minio:9000 minio minio123
-mc mb -p local/media || true
 
+# 미디어 버킷
+mc mb -p local/media || true
 # 개발 편의를 위해 공개 다운로드 허용(운영에선 조정)
 mc anonymous set download local/media
+
+# 아바타 버킷
+mc mb -p local/avatars || true
+mc anonymous set download local/avatars
 
 # 컨테이너가 바로 종료되지 않도록 대기
 sleep infinity

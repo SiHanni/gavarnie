@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuthModal } from '@/contexts/AuthModalContext';
 import { ENV } from '@/lib/env';
 import { login, signUp, storeToken, fetchProfile } from '@/lib/http';
-import { saveUserProfile } from '@/lib/user';
+import { saveUserProfile, type UserProfile } from '@/lib/user';
 
 export default function AuthModal() {
   const { isOpen, close, mode, setMode } = useAuthModal();
@@ -50,10 +50,21 @@ export default function AuthModal() {
           ? await login(email, password)
           : await signUp(email, password, displayName);
 
+      // 토큰 저장 후 내 프로필 조회
       storeToken(r.accessToken);
       const me = await fetchProfile();
-      saveUserProfile(me);
-      window.dispatchEvent(new CustomEvent('auth:login', { detail: me }));
+
+      // ⚙️ handle: null → undefined로 정규화
+      const normalized: UserProfile = {
+        ...me,
+        handle: me.handle ?? undefined,
+      };
+
+      saveUserProfile(normalized);
+      window.dispatchEvent(
+        new CustomEvent('auth:login', { detail: normalized })
+      );
+
       close();
     } catch (e: any) {
       setErr(
@@ -86,14 +97,13 @@ export default function AuthModal() {
         className='relative z-[9999] max-h-[92vh] overflow-y-auto border border-white/10
                    bg-neutral-950/90 shadow-[0_10px_40px_rgba(0,0,0,0.6)]'
         style={{
-          /* 화면이 작을수록 작고, 크게는 520~560px 사이에서 자연 확장 */
           width: 'clamp(300px, 92vw, 540px)',
           borderRadius: 'clamp(14px, 3.5vw, 18px)',
         }}
       >
-        {/* 상단 헤더(그라디언트) */}
+        {/* 상단 헤더(그라데이션, 구분선 제거됨) */}
         <div
-          className='relative border-b border-white/10'
+          className='relative'
           style={{
             paddingInline: 'clamp(16px, 4.5vw, 24px)',
             paddingBlock: 'clamp(10px, 3.2vw, 18px)',

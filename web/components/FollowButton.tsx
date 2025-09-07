@@ -6,26 +6,31 @@ import { loadUserProfile } from '@/lib/user';
 import { useAuthModal } from '@/contexts/AuthModalContext';
 
 type Size = 'sm' | 'md' | 'lg';
-type Variant = 'ghost' | 'pill'; // 피드: ghost / 프로필: pill
+type Variant = 'ghost' | 'pill';
+
+const stripAt = (s: string) => (s?.startsWith('@') ? s.slice(1) : s);
 
 export default function FollowButton({
-  targetUserId,
+  targetHandle,
   size = 'sm',
   variant = 'ghost',
   className,
 }: {
-  targetUserId: string;
+  targetHandle: string;
   size?: Size;
   variant?: Variant;
   className?: string;
 }) {
   const me = typeof window !== 'undefined' ? loadUserProfile() : null;
-  const isMine = !!me && String(me.id) === String(targetUserId);
   const { open: openAuth } = useAuthModal();
 
-  if (isMine) return null;
+  const normTarget = stripAt(targetHandle || '');
+  const myHandle = stripAt(((me as any)?.handle as string | undefined) || '');
 
-  const { isFollowing, isLoading, toggle } = useFollow(targetUserId);
+  // 타겟 핸들이 없거나, 내가 나면 숨김
+  if (!normTarget || (myHandle && myHandle === normTarget)) return null;
+
+  const { isFollowing, isLoading, toggle } = useFollow(normTarget);
   const label = isFollowing ? '팔로잉' : '팔로우';
 
   const sizeCls: Record<Size, string> = {
@@ -34,17 +39,11 @@ export default function FollowButton({
     lg: 'h-11 px-4 text-[14px]',
   };
 
-  // ===== 피드용(ghost): 완전 투명, 테두리+글자만 보임 =====
-  // - 기본: 흰색 테두리/글자
-  // - 구독 중: 보라색 테두리/글자
   const ghostBase =
-    'rounded-full border bg-transparent text-white ' +
-    'border-white/80 hover:bg-transparent focus:outline-none focus:ring-2 focus:ring-white/30';
+    'rounded-full border bg-transparent text-white border-white/80 hover:bg-transparent focus:outline-none focus:ring-2 focus:ring-white/30';
   const ghostFollowing =
-    'rounded-full border bg-transparent ' +
-    'border-[#5a319f] text-[#5a319f] hover:bg-transparent focus:outline-none focus:ring-2 focus:ring-[#5a319f]/40';
+    'rounded-full border bg-transparent border-[#5a319f] text-[#5a319f] hover:bg-transparent focus:outline-none focus:ring-2 focus:ring-[#5a319f]/40';
 
-  // ===== 프로필용(pill): 기존 유지(연한 배경, 구독 중 보라색 배경) =====
   const pillBase =
     'rounded-xl border border-white/20 bg-white/10 hover:bg-white/16 text-white focus:outline-none focus:ring-2 focus:ring-white/20';
   const pillFollowing =
@@ -62,10 +61,11 @@ export default function FollowButton({
   return (
     <button
       type='button'
-      disabled={isLoading}
+      disabled={isLoading || !normTarget}
+      aria-disabled={isLoading || !normTarget}
       onClick={() => {
         if (!me) {
-          openAuth('login'); // 미로그인 → 로그인 모달
+          openAuth('login');
           return;
         }
         toggle();

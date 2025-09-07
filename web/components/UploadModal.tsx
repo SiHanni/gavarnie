@@ -61,6 +61,7 @@ export default function UploadModal() {
   const [progress, setProgress] = useState<number>(0);
   const [richError, setRichError] = useState<React.ReactNode | null>(null);
   const [myGrade, setMyGrade] = useState<UserGrade>('basic');
+  const [isNarrow, setIsNarrow] = useState(false); // ≤360px 화면 대응
 
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,6 +70,15 @@ export default function UploadModal() {
     if (!file) return '';
     return filenameWithoutExt(file.name).slice(0, TITLE_MAX);
   }, [file]);
+
+  // 매우 좁은 화면 감지
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 360px)');
+    const apply = () => setIsNarrow(mq.matches);
+    apply();
+    mq.addEventListener?.('change', apply);
+    return () => mq.removeEventListener?.('change', apply);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -159,6 +169,19 @@ export default function UploadModal() {
 
       setStep('done');
       setMsg('완료! 피드에서 확인할 수 있어요.');
+
+      // NEW: 업로드 성공 알림 이벤트 발행 (mediaId 포함)
+      if (typeof window !== 'undefined') {
+        try {
+          window.dispatchEvent(
+            new CustomEvent('media:uploaded', { detail: { mediaId } })
+          );
+        } catch {
+          // 일부 브라우저 호환
+          window.dispatchEvent(new Event('media:uploaded'));
+        }
+      }
+
       close();
     } catch (e: any) {
       const status: number | undefined =
@@ -170,9 +193,9 @@ export default function UploadModal() {
         '업로드 중 오류가 발생했습니다.';
 
       const isFileTooLarge =
-        status === 413 || /한도|too\s*large|FILE_TOO_LARGE/i.test(serverMsg);
+        status === 413 || /too\s*large|FILE_TOO_LARGE/i.test(serverMsg);
       const isDailyExceeded =
-        status === 403 &&
+        status === 403 ||
         /일일\s*업로드\s*한도|max\s*per\s*day|한도를\s*초과/i.test(serverMsg);
 
       if (isFileTooLarge) {
@@ -182,7 +205,7 @@ export default function UploadModal() {
         setMsg('');
         setRichError(
           <span>
-            파일이 <b style={{ color: ACCENT }}>{label}</b> 등급 한도{' '}
+            파일 크기가 <b style={{ color: ACCENT }}>{label}</b> 등급 한도{' '}
             <b style={{ color: ACCENT }}>{maxMB}MB</b> 를 초과했습니다.
           </span>
         );
@@ -193,7 +216,7 @@ export default function UploadModal() {
         setMsg('');
         setRichError(
           <span>
-            오늘은 <b style={{ color: ACCENT }}>{label}</b> 등급 일일 한도{' '}
+            오늘은 <b style={{ color: ACCENT }}>{label}</b> 등급 일일 업로드 수{' '}
             <b style={{ color: ACCENT }}>{maxCnt}개</b>를 초과했습니다.
           </span>
         );
@@ -226,27 +249,29 @@ export default function UploadModal() {
       aria-modal='true'
       className='fixed inset-0 z-[9999] grid place-items-center'
     >
+      {/* 오버레이 */}
       <div
         className='fixed inset-0 z-[9998] bg-black/70'
         onClick={cancelAll}
         aria-hidden
       />
 
+      {/* 카드 */}
       <div
         className='relative z-[9999] overflow-y-auto border border-white/10 bg-neutral-950 text-white shadow-2xl'
         onClick={e => e.stopPropagation()}
         style={{
-          width: 'clamp(320px, 92vw, 560px)',
+          width: 'clamp(220px, 88vw, 560px)',
           maxHeight: '92vh',
-          borderRadius: 'clamp(14px, 3.5vw, 18px)',
+          borderRadius: 'clamp(12px, 3.5vw, 18px)',
         }}
       >
         {/* 헤더 */}
         <div
-          className='relative border-b border-white/10'
+          className='relative'
           style={{
-            paddingInline: 'clamp(16px, 4.5vw, 24px)',
-            paddingBlock: 'clamp(10px, 3.2vw, 18px)',
+            paddingInline: 'clamp(12px, 4.5vw, 24px)',
+            paddingBlock: 'clamp(8px, 3.2vw, 18px)',
             borderTopLeftRadius: 'inherit',
             borderTopRightRadius: 'inherit',
             background:
@@ -255,7 +280,7 @@ export default function UploadModal() {
         >
           <h2
             className='text-center font-bold'
-            style={{ fontSize: 'clamp(18px, 5vw, 22px)' }}
+            style={{ fontSize: 'clamp(16px, 5vw, 22px)' }}
           >
             <span style={{ color: ACCENT }}>Catarie</span> 업로드
           </h2>
@@ -265,9 +290,9 @@ export default function UploadModal() {
             aria-label='닫기'
             className='absolute text-white/75 hover:text-white transition-colors'
             style={{
-              right: 'clamp(8px, 2.6vw, 12px)',
-              top: 'clamp(6px, 2.2vw, 10px)',
-              fontSize: 'clamp(18px, 6vw, 22px)',
+              right: 'clamp(6px, 2.6vw, 12px)',
+              top: 'clamp(4px, 2.2vw, 10px)',
+              fontSize: 'clamp(16px, 6vw, 22px)',
               lineHeight: 1,
               padding: '2px 6px',
             }}
@@ -279,54 +304,54 @@ export default function UploadModal() {
         {/* 본문 */}
         <div
           style={{
-            paddingInline: 'clamp(16px, 4.5vw, 24px)',
-            paddingBlock: 'clamp(14px, 4.2vw, 22px)',
+            paddingInline: 'clamp(12px, 4.5vw, 24px)',
+            paddingBlock: 'clamp(10px, 4.2vw, 22px)',
           }}
         >
           <p
             className='text-white/60'
-            style={{ fontSize: 'clamp(11px, 3.2vw, 12px)' }}
+            style={{ fontSize: 'clamp(10px, 3.2vw, 12px)' }}
           >
-            현재 등급: <b style={{ color: ACCENT }}>{GRADE_LABEL[myGrade]}</b> ·
-            용량 제한:{' '}
-            <b style={{ color: ACCENT }}>{GRADE_MAX_MB[myGrade]}MB</b> · 일일
-            한도:{' '}
-            <b style={{ color: ACCENT }}>{GRADE_MAX_PER_DAY[myGrade]}개</b>
+            현재 등급: <b style={{ color: ACCENT }}>{GRADE_LABEL[myGrade]}</b>
+            <br />
+            일일 한도:{' '}
+            <b style={{ color: ACCENT }}>{GRADE_MAX_PER_DAY[myGrade]}개</b> ·
+            일일 용량 제한:{' '}
+            <b style={{ color: ACCENT }}>{GRADE_MAX_MB[myGrade]}MB</b>
           </p>
 
           {/* 제목 */}
-          <div style={{ marginTop: 'clamp(10px, 3.4vw, 14px)' }}>
+          <div style={{ marginTop: 'clamp(8px, 3.4vw, 14px)' }}>
             <label
               className='block text-white/70'
               style={{
-                fontSize: 'clamp(12px, 3.4vw, 14px)',
+                fontSize: 'clamp(11px, 3.4vw, 14px)',
                 marginBottom: '6px',
               }}
             >
-              제목 (선택)
+              제목 (기본: 파일이름)
             </label>
             <div
               className='flex items-center gap-2 rounded-xl border bg-white/5'
               style={{
                 borderColor: 'rgba(255,255,255,0.15)',
-                paddingInline: 'clamp(10px, 3.6vw, 12px)',
-                paddingBlock: 'clamp(8px, 2.6vw, 10px)',
+                paddingInline: 'clamp(8px, 3.6vw, 12px)',
+                paddingBlock: 'clamp(6px, 2.6vw, 10px)',
+                minWidth: 0,
               }}
             >
               <input
                 type='text'
                 className='flex-1 bg-transparent outline-none'
-                style={{ fontSize: 'clamp(13px, 3.6vw, 15px)' }}
+                style={{ fontSize: 'clamp(12px, 3.6vw, 15px)', minWidth: 0 }}
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 maxLength={TITLE_MAX}
-                placeholder={
-                  defaultTitle || '제목을 입력하세요 (미입력 시 파일명 사용)'
-                }
+                placeholder={defaultTitle || '제목을 입력하세요'}
               />
               <span
                 className='text-white/50'
-                style={{ fontSize: 'clamp(11px, 3vw, 12px)' }}
+                style={{ fontSize: 'clamp(10px, 3vw, 12px)' }}
               >
                 {title.length}/{TITLE_MAX}
               </span>
@@ -339,8 +364,8 @@ export default function UploadModal() {
             onDrop={onDrop}
             className='rounded-xl border border-dashed text-center'
             style={{
-              marginTop: 'clamp(12px, 3.8vw, 16px)',
-              padding: 'clamp(14px, 4.4vw, 22px)',
+              marginTop: 'clamp(10px, 3.8vw, 16px)',
+              padding: 'clamp(12px, 4.4vw, 22px)',
               borderColor: 'rgba(255,255,255,0.25)',
               background:
                 'linear-gradient(135deg, rgba(90,49,159,0.10), rgba(255,255,255,0.04))',
@@ -350,14 +375,14 @@ export default function UploadModal() {
               <>
                 <p
                   className='text-white/85'
-                  style={{ fontSize: 'clamp(13px, 3.6vw, 15px)' }}
+                  style={{ fontSize: 'clamp(12px, 3.6vw, 15px)' }}
                 >
                   여기에 드래그 앤 드롭하거나, 아래 버튼으로 파일을 선택하세요.
                 </p>
                 <p
                   className='text-white/55'
                   style={{
-                    fontSize: 'clamp(11px, 3.2vw, 12px)',
+                    fontSize: 'clamp(10px, 3.2vw, 12px)',
                     marginTop: '4px',
                   }}
                 >
@@ -367,12 +392,12 @@ export default function UploadModal() {
                   className='inline-block font-semibold cursor-pointer'
                   style={{
                     display: 'inline-block',
-                    marginTop: 'clamp(10px, 3.6vw, 14px)',
-                    paddingInline: 'clamp(12px, 4vw, 16px)',
+                    marginTop: 'clamp(8px, 3.6vw, 14px)',
+                    paddingInline: 'clamp(10px, 4vw, 16px)',
                     paddingBlock: 'clamp(8px, 2.6vw, 10px)',
                     borderRadius: '12px',
                     backgroundColor: ACCENT,
-                    fontSize: 'clamp(13px, 3.6vw, 15px)',
+                    fontSize: 'clamp(12px, 3.6vw, 15px)',
                   }}
                 >
                   파일 선택
@@ -388,7 +413,7 @@ export default function UploadModal() {
               <div className='text-left'>
                 <div
                   className='text-white/90 break-all'
-                  style={{ fontSize: 'clamp(12px, 3.4vw, 14px)' }}
+                  style={{ fontSize: 'clamp(11px, 3.4vw, 14px)' }}
                 >
                   선택됨: {file.name}{' '}
                   <span className='text-white/50'>
@@ -397,7 +422,7 @@ export default function UploadModal() {
                 </div>
 
                 {step === 'uploading' && (
-                  <div style={{ marginTop: 'clamp(10px, 3.4vw, 12px)' }}>
+                  <div style={{ marginTop: 'clamp(8px, 3.4vw, 12px)' }}>
                     <div
                       className='w-full rounded bg-white/10 overflow-hidden'
                       style={{ height: 'clamp(6px, 1.8vw, 8px)' }}
@@ -413,7 +438,7 @@ export default function UploadModal() {
                     <div
                       className='text-white/65'
                       style={{
-                        fontSize: 'clamp(11px, 3vw, 12px)',
+                        fontSize: 'clamp(10px, 3vw, 12px)',
                         marginTop: '6px',
                       }}
                     >
@@ -429,8 +454,9 @@ export default function UploadModal() {
           <div
             className='flex items-center'
             style={{
-              marginTop: 'clamp(12px, 3.8vw, 16px)',
+              marginTop: 'clamp(10px, 3.8vw, 16px)',
               gap: 'clamp(6px, 2vw, 10px)',
+              flexWrap: 'wrap',
             }}
           >
             <button
@@ -444,38 +470,25 @@ export default function UploadModal() {
               }
               className='font-semibold disabled:opacity-50'
               style={{
+                flex: isNarrow ? '1 0 100%' : '0 0 auto',
                 paddingInline: 'clamp(12px, 4vw, 16px)',
                 paddingBlock: 'clamp(9px, 2.8vw, 11px)',
                 borderRadius: '12px',
                 backgroundColor: ACCENT,
-                fontSize: 'clamp(13px, 3.6vw, 15px)',
+                fontSize: 'clamp(12px, 3.6vw, 15px)',
               }}
             >
               업로드 시작
             </button>
-            <button
-              onClick={cancelAll}
-              className='border'
-              style={{
-                paddingInline: 'clamp(10px, 3.6vw, 14px)',
-                paddingBlock: 'clamp(8px, 2.6vw, 10px)',
-                borderRadius: '12px',
-                backgroundColor: 'rgba(255,255,255,0.06)',
-                borderColor: 'rgba(255,255,255,0.2)',
-                fontSize: 'clamp(13px, 3.6vw, 15px)',
-              }}
-            >
-              닫기
-            </button>
           </div>
 
-          {/* ▶ 상태 문구: 버튼 아래로 이동 / 중앙 정렬 */}
+          {/* 상태 문구 */}
           {(richError || msg) && (
             <div
               className={richError ? 'text-red-300' : 'text-white/80'}
               style={{
-                marginTop: 'clamp(10px, 3.2vw, 14px)',
-                fontSize: 'clamp(12px, 3.2vw, 13px)',
+                marginTop: 'clamp(8px, 3.2vw, 14px)',
+                fontSize: 'clamp(11px, 3.2vw, 13px)',
                 textAlign: 'center',
               }}
             >
@@ -483,10 +496,8 @@ export default function UploadModal() {
             </div>
           )}
 
-          {/* 안내 문구 삭제됨: (요청에 따라 “업로드 직후에는 작업 큐…” 제거) */}
-
           {(step === 'done' || step === 'failed' || step === 'error') && (
-            <div style={{ marginTop: 'clamp(12px, 3.8vw, 16px)' }}>
+            <div style={{ marginTop: 'clamp(10px, 3.8vw, 16px)' }}>
               <button
                 onClick={cancelAll}
                 className='font-semibold'
@@ -495,7 +506,7 @@ export default function UploadModal() {
                   paddingBlock: 'clamp(9px, 2.8vw, 11px)',
                   borderRadius: '12px',
                   backgroundColor: ACCENT,
-                  fontSize: 'clamp(13px, 3.6vw, 15px)',
+                  fontSize: 'clamp(12px, 3.6vw, 15px)',
                 }}
               >
                 닫기

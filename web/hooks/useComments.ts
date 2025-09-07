@@ -18,7 +18,6 @@ import { hasStoredToken } from '@/lib/http';
 import { useAuthModal } from '@/contexts/AuthModalContext';
 import { useState } from 'react';
 import { bumpRecentCommentCount } from '@/lib/queryUtils';
-// FIX: 내 프로필 로드해서 낙관적 노드 author 채우기
 import { loadUserProfile } from '@/lib/user';
 
 const qKey = (mediaId: string | null, parentId?: string | null) =>
@@ -81,29 +80,31 @@ export function useCreateComment() {
       const prev = qc.getQueryData<InfiniteData<CommentsPage>>(key);
       const optimisticId = `opt:${Date.now()}`;
 
-      // FIX: 내 프로필로 author 채우기 (UI가 author를 바로 참조해도 안전)
+      // 내 프로필로 author 채우기 (handle 포함)
       const me = typeof window !== 'undefined' ? loadUserProfile() : null;
 
       qc.setQueryData<InfiniteData<CommentsPage>>(key, old => {
         const optimisticNode = {
           id: optimisticId,
           parentId: parentId ?? null,
+          depth: parentId ? 1 : 0,
           text,
           createdAt: new Date().toISOString(),
           likeCount: 0,
           replyCount: 0,
-          isDeleted: false, // FIX: 안전하게 기본값
+          isDeleted: false,
           author: me
             ? {
-                id: me.id,
+                id: me.id ?? 'me',
                 displayName: me.displayName ?? '나',
                 avatarUrl: me.avatarUrl ?? null,
+                handle: me.handle ?? '', // ← 프로필 라우팅용
               }
-            : // 프로필이 없더라도 안전한 기본값
-              {
+            : {
                 id: 'me',
                 displayName: '나',
                 avatarUrl: null,
+                handle: '',
               },
         } as unknown as CommentNode;
 
@@ -155,7 +156,7 @@ export function useDeleteComment() {
 
   return useMutation({
     mutationFn: async (vars: {
-      mediaId: string; // FIX: 반드시 전달 필요
+      mediaId: string; // 반드시 전달
       commentId: string;
       parentId?: string | null;
     }) => {
@@ -169,16 +170,13 @@ export function useDeleteComment() {
     onMutate: async vars => {
       const { mediaId, commentId } = vars;
 
-      // FIX: mediaId 스코프로 취소/스냅샷 수집
       const keyPrefix = ['comments', mediaId] as const;
-
       await qc.cancelQueries({ queryKey: keyPrefix });
 
       const prevEntries = qc.getQueriesData<InfiniteData<CommentsPage>>({
         queryKey: keyPrefix,
       });
 
-      // 모든 관련 쿼리에서 해당 코멘트 제거
       for (const [key, data] of prevEntries) {
         if (!data) continue;
         qc.setQueryData<InfiniteData<CommentsPage>>(key, old => {
@@ -193,9 +191,7 @@ export function useDeleteComment() {
         });
       }
 
-      // 액션바 카운트 -1
       bumpRecentCommentCount(qc, mediaId, -1);
-
       return { prevEntries, mediaId } as const;
     },
 
@@ -209,7 +205,6 @@ export function useDeleteComment() {
     },
 
     onSettled: (_data, _err, vars) => {
-      // 같은 미디어의 모든 댓글 쿼리 동기화
       qc.invalidateQueries({ queryKey: ['comments', vars.mediaId] });
     },
   });
@@ -235,7 +230,7 @@ export function useCommentLike(commentId: string, serverCount: number) {
       return currentlyLiked ? unlikeComment(commentId) : likeComment(commentId);
     },
     onMutate: () => {
-      setLiked(v => !v); // 카운트는 서버 재조회로
+      setLiked(v => !v);
     },
     onSuccess: res => {
       if (typeof window !== 'undefined') {
