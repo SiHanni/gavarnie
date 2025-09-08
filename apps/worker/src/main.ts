@@ -1,44 +1,47 @@
-// ===== [ENV BOOTSTRAP] 최상단 고정 =====
-import * as path from 'path';
-import * as fs from 'fs';
-import { config as dotenv } from 'dotenv';
-
+import 'reflect-metadata';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { LoggerService } from '@nestjs/common';
 import pino from 'pino';
 import { createLogger } from '@libs/logging';
 
-const candidates = [
-  path.resolve(__dirname, '../.env.development'), // apps/worker/.env.development (ts-node 실행/빌드 실행 모두 커버)
-  path.resolve(process.cwd(), 'apps/worker/.env.development'),
-  path.resolve(process.cwd(), '.env'),
-];
-const envPath = candidates.find((p) => fs.existsSync(p));
-if (envPath) {
-  dotenv({ path: envPath });
-} else {
-  console.warn('[worker env] NO .env found. Tried:', candidates);
-}
-
-// ===== [BullMQ 워커 기동] =====
-// 기존 BullMQ 워커 초기화 파일을 import 하면 즉시 실행됩니다.
-import './worker';
-
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+// Pino → Nest Logger 어댑터
+const pinoLogger: pino.Logger = createLogger('worker');
+const nestLogger: LoggerService = {
+  log: (msg: any) => pinoLogger.info(msg),
+  error: (msg: any, trace?: string) => pinoLogger.error({ trace }, msg),
+  warn: (msg: any) => pinoLogger.warn(msg),
+  debug: (msg: any) => pinoLogger.debug(msg),
+  verbose: (msg: any) => pinoLogger.debug(msg),
+};
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { logger: false });
-  const logger: pino.Logger = createLogger('worker');
-
-  app.useLogger({
-    log: (msg) => logger.info(msg),
-    error: (msg, trace) => logger.error({ trace }, msg),
-    warn: (msg) => logger.warn(msg),
-    debug: (msg) => logger.debug(msg),
-    verbose: (msg) => logger.debug(msg),
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    logger: nestLogger,
   });
 
-  const port = parseInt(process.env.PORT ?? '3001', 10); // 워커 헬스/메트릭 서버 포트
-  await app.listen(port);
-  logger.info('Worker service started');
+  pinoLogger.info(
+    { env: process.env.NODE_ENV },
+    'Worker context started (Nest DI mode)',
+  );
+
+  // 그레이스풀 셧다운: WorkerRunner.onModuleDestroy가 호출되어 자원 정리됨
+  const shutdown = async () => {
+    try {
+      await app.close();
+      pinoLogger.info('Worker context closed');
+    } finally {
+      process.exit(0);
+    }
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
-bootstrap();
+
+bootstrap().catch((err) => {
+  pinoLogger.error(
+    { err: err?.message || String(err) },
+    'Fatal bootstrap error',
+  );
+  process.exit(1);
+});

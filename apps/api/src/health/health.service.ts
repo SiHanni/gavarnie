@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import IORedis from 'ioredis';
 import * as mysql from 'mysql2/promise';
-import mongoose from 'mongoose';
-import { MongoClient } from 'mongodb';
 
 @Injectable()
 export class HealthService {
@@ -22,33 +20,14 @@ export class HealthService {
       mysqlOk = true;
     } catch {}
 
-    // Mongo ping
-    let mongoOk = false;
-    try {
-      // 1) 이미 Mongoose 연결이 열려 있으면 그걸로 ping
-      if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
-        await mongoose.connection.db.admin().ping();
-        mongoOk = true;
-      } else {
-        // 2) 아직이면 공식 드라이버로 1회성 ping
-        const uri = process.env.MONGO_URI ?? '';
-        const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
-        await client.connect();
-        await client.db().admin().ping();
-        await client.close();
-        mongoOk = true;
-      }
-    } catch {
-      mongoOk = false;
-    }
-
     // Redis ping
     let redisOk = false;
-    const redis = new IORedis({
-      host: process.env.REDIS_HOST,
-      port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
-      lazyConnect: true,
-    });
+    const redis = new IORedis(
+      process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
+      {
+        lazyConnect: true,
+      },
+    );
     try {
       await redis.connect();
       const pong = await redis.ping();
@@ -62,7 +41,6 @@ export class HealthService {
 
     return {
       mysql: mysqlOk ? 'ok' : 'fail',
-      mongo: mongoOk ? 'ok' : 'fail',
       redis: redisOk ? 'ok' : 'fail',
       env: process.env.NODE_ENV,
     };

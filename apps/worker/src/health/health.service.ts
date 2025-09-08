@@ -41,11 +41,12 @@ export class HealthService {
     }
 
     let redisOk = false;
-    const redis = new IORedis({
-      host: process.env.REDIS_HOST,
-      port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
-      lazyConnect: true,
-    });
+    const redis = new IORedis(
+      process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
+      {
+        lazyConnect: true,
+      },
+    );
     try {
       await redis.connect();
       const pong = await redis.ping();

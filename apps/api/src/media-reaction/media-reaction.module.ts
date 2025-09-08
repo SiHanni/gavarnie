@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from '@gavarnie/entities';
-import { MediaReaction } from '@gavarnie/entities';
-import { MediaCore } from '@gavarnie/entities';
+import { User } from '@catarie/entities';
+import { MediaReaction } from '@catarie/entities';
+import { MediaCore } from '@catarie/entities';
 import { MediaReactionService } from './media-reaction.service';
 import { MediaReactionController } from './media-reaction.controller';
 

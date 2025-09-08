@@ -16,8 +16,8 @@ import { DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import * as path from 'path';
 
 import { S3Service } from '../storage/s3.service';
-import { Comment, Media, MediaReaction, User } from '@gavarnie/entities';
-import { MediaCore } from '@gavarnie/entities';
+import { Comment, Media, MediaReaction, User } from '@catarie/entities';
+import { MediaCore } from '@catarie/entities';
 import { TRANSCODE_QUEUE } from '../queue/queue.module';
 import { MEDIA_EXTS } from './exts';
 import { decodeCursor, encodeCursor } from './utils/cursor.util';

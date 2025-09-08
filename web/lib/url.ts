@@ -1,7 +1,7 @@
 import { ENV } from '@/lib/env';
 
 /**
- * ENV.HLS(NEXT_PUBLIC_HLS_BASE_URL)를 결합합니다.
+ * ENV.HLS(NEXT_PUBLIC_CDN_BASE_URL)를 결합합니다.
  * - base/key의 중복/결여 슬래시를 정리합니다.
  * - HLS 베이스가 비어있어도 동작하도록 안전 폴백 처리.
  */

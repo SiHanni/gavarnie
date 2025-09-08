@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS gavarnie_core CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-USE gavarnie_core;
+CREATE DATABASE IF NOT EXISTS catarie_core CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE catarie_core;
 
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,

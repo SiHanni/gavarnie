@@ -13,7 +13,7 @@ import {
   MediaCore,
   MediaReaction,
   User,
-} from '@gavarnie/entities';
+} from '@catarie/entities';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import {
   UserMediaQueryDto,

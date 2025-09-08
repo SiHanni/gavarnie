@@ -1,16 +1,17 @@
 {
-  "name": "@gavarnie/worker",
+  "name": "@catarie/worker",
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",
   "scripts": {
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "start": "node dist/apps/worker/main.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
     "@aws-sdk/lib-storage": "^3.873.0",
-    "@gavarnie/entities": "workspace:*",
+    "@catarie/entities": "workspace:*",
     "@libs/logging": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",

@@ -1,5 +1,5 @@
 {
-  "name": "gavarnie",
+  "name": "catarie",
   "private": true,
   "version": "0.1.0",
   "workspaces": [
@@ -12,10 +12,10 @@
   "scripts": {
     "build": "tsc -b -v",
     "build:clean": "rimraf apps/**/dist libs/**/dist",
-    "dev:api": "NODE_ENV=development yarn workspace @gavarnie/api start:dev",
-    "dev:worker": "NODE_ENV=development yarn workspace @gavarnie/worker start:dev",
-    "dev:entities:watch": "yarn workspace @gavarnie/entities build:watch",
-    "dev:all": "yarn workspace @gavarnie/entities build && concurrently -n ENTITIES,API,WORKER -c auto \"yarn workspace @gavarnie/entities build:watch\" \"yarn workspace @gavarnie/api start:dev\" \"yarn workspace @gavarnie/worker start:dev\""
+    "dev:api": "NODE_ENV=development yarn workspace @catarie/api start:dev",
+    "dev:worker": "NODE_ENV=development yarn workspace @catarie/worker start:dev",
+    "dev:entities:watch": "yarn workspace @catarie/entities build:watch",
+    "dev:all": "yarn workspace @catarie/entities build && concurrently -n ENTITIES,API,WORKER -c auto \"yarn workspace @catarie/entities build:watch\" \"yarn workspace @catarie/api start:dev\" \"yarn workspace @catarie/worker start:dev\""
   },
   "packageManager": "yarn@4.9.3",
   "devDependencies": {

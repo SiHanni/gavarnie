@@ -11,9 +11,9 @@ const __dirname = dirname(__filename);
 // repo root: libs/migrations/src → ../../..
 const repoRoot = join(__dirname, '../../..');
 
-// ENV_FILE 지정 없으면 루트 .env.db.development 사용
+// ENV_FILE 지정 없으면 루트 .env.common.development 사용
 const envFilePath =
-  process.env.ENV_FILE ?? join(repoRoot, '.env.db.development');
+  process.env.ENV_FILE ?? join(repoRoot, '.env.common.development');
 dotenvConfig({ path: envFilePath });
 
 // 마이그레이션 스크립트 폴더
@@ -44,7 +44,7 @@ export async function getDataSource(): Promise<DataSource> {
     port: Number(process.env.MYSQL_PORT ?? '3306'),
     username: process.env.MYSQL_USER ?? 'root',
     password: process.env.MYSQL_PASSWORD ?? 'root',
-    database: process.env.MYSQL_DB ?? 'gavarnie_core',
+    database: process.env.MYSQL_DB ?? 'catarie_core',
     charset: 'utf8mb4',
     synchronize: false,
     logging: true,

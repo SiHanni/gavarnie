@@ -10,7 +10,7 @@ import {
   MediaCore,
   MediaReaction,
   Comment,
-} from '@gavarnie/entities';
+} from '@catarie/entities';
 import { MEDIA_CORE_STATUS, MEDIA_STATUS } from './media.constants';
 import { randomUUID } from 'crypto';
 

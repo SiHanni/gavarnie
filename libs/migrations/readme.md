@@ -7,5 +7,5 @@
 - 마이그레이션 명령어
 
 ```
-yarn workspace @gavarnie/migrations migrate:run
+yarn workspace @catarie/migrations migrate:run
 ```

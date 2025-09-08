@@ -6,7 +6,7 @@ import {
   Media,
   MediaCore,
   User,
-} from '@gavarnie/entities';
+} from '@catarie/entities';
 import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
 
