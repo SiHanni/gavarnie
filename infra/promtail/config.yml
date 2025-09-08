@@ -1,0 +1,49 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+positions:
+  filename: /tmp/positions.yaml
+
+scrape_configs:
+  - job_name: catarie-files
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: catarie
+          __path__: /var/log/catarie/*.ndjson
+
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            service: service
+            msg: msg
+            requestId: requestId
+            traceId: traceId
+            userId: userId
+            method: 'req.method'
+            url: 'req.url'
+            status: 'res.statusCode'
+            responseTime: responseTime
+            time: time
+
+      # NDJSON의 "time"은 ISO 8601이므로 그대로 파싱
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+      # url에서 쿼리스트링 제거 → path 필드 생성 (라벨 아님)
+      - regex:
+          expression: '^(?P<path>[^?]+)'
+          source: url
+
+      # 고카디널리티 방지: 꼭 필요한 라벨만
+      - labels:
+          level:
+          service:
+          method:
+          status:

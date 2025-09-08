@@ -3,6 +3,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { config as dotenv } from 'dotenv';
 
+import pino from 'pino';
+import { createLogger } from '@libs/logging';
+
 const candidates = [
   path.resolve(__dirname, '../.env.development'), // apps/worker/.env.development (ts-node 실행/빌드 실행 모두 커버)
   path.resolve(process.cwd(), 'apps/worker/.env.development'),
@@ -23,11 +26,19 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['log', 'error', 'warn'],
+  const app = await NestFactory.create(AppModule, { logger: false });
+  const logger: pino.Logger = createLogger('worker');
+
+  app.useLogger({
+    log: (msg) => logger.info(msg),
+    error: (msg, trace) => logger.error({ trace }, msg),
+    warn: (msg) => logger.warn(msg),
+    debug: (msg) => logger.debug(msg),
+    verbose: (msg) => logger.debug(msg),
   });
+
   const port = parseInt(process.env.PORT ?? '3001', 10); // 워커 헬스/메트릭 서버 포트
   await app.listen(port);
-  console.log(`[WORKER] health server listening on http://localhost:${port}`);
+  logger.info('Worker service started');
 }
 bootstrap();

@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "libs/entities" },
+    { "path": "libs/logging" },
     { "path": "apps/api" },
     { "path": "apps/worker" }
   ]

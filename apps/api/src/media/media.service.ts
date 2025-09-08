@@ -230,7 +230,8 @@ export class MediaService {
       { mediaId: media.id, srcKey: media.srcKey },
       {
         jobId: media.id,
-        removeOnComplete: false,
+        removeOnComplete: true, // 완료된 작업은 바로 제거
+        removeOnFail: 1000, // 실패한 작업은 최근 1000개만 보관
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
       },

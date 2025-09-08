@@ -12,8 +12,22 @@ import { ExpressAdapter } from '@bull-board/express';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 
+import { httpLoggerMiddleware } from '@libs/logging';
+import pino from 'pino';
+import { createLogger } from '@libs/logging';
+
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { logger: false });
+  app.use(httpLoggerMiddleware('api'));
+
+  const logger: pino.Logger = createLogger('api');
+  app.useLogger({
+    log: (msg) => logger.info(msg),
+    error: (msg, trace) => logger.error({ trace }, msg),
+    warn: (msg) => logger.warn(msg),
+    debug: (msg) => logger.debug(msg),
+    verbose: (msg) => logger.debug(msg),
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -103,6 +117,7 @@ async function bootstrap() {
 
   const port = parseInt(process.env.PORT ?? '3000', 10);
   await app.listen(port);
-  console.log(`[API] listening on http://localhost:${port}`);
+
+  logger.info({ port }, 'API listening');
 }
 bootstrap();

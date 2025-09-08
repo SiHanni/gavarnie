@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MongooseModule } from '@nestjs/mongoose';
 import { HealthModule } from './health/health.module';
 import { MediaModule } from './media/media.module';
 import {
@@ -20,6 +19,9 @@ import { CommentsModule } from './comments/comments.module';
 import { CommentReactionsModule } from './comments-reactions/comment-reactions.module';
 import { UserFollowsModule } from './user-follows/follow.module';
 import { AvatarsModule } from './avatars/avatars.module';
+
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { ApiRequestContextInterceptor } from './logging/request-context.interceptor';
 
 @Module({
   imports: [
@@ -49,7 +51,6 @@ import { AvatarsModule } from './avatars/avatars.module';
         logging: true,
       }),
     }),
-    MongooseModule.forRoot(process.env.MONGO_URI || ''),
     HealthModule,
     MediaModule,
     UsersModule,
@@ -59,6 +60,12 @@ import { AvatarsModule } from './avatars/avatars.module';
     CommentReactionsModule,
     UserFollowsModule,
     AvatarsModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ApiRequestContextInterceptor,
+    },
   ],
 })
 export class AppModule {}

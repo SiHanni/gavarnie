@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { extname, join } from 'path';
 import { downloadToFile, uploadDir } from './s3';
+import { logger } from './logging/logging';
 
 ffmpeg.setFfmpegPath(ffmpegPath || '');
 
@@ -28,21 +29,47 @@ function inferKind(contentType: string | undefined, srcKey: string): MediaKind {
 
 /**
  * fluent-ffmpeg 실행을 Promise로 래핑
+ * - 진행률 로그는 기본 1.5초 간격으로만 출력 (스팸 방지)
+ * - FFMPEG_VERBOSE=1 이면 stderr 라인도 debug로 기록
  */
 function runFfmpeg(cmd: ffmpeg.FfmpegCommand): Promise<void> {
+  const ffmpegLog = logger.child({ mod: 'ffmpeg' });
+  const intervalMs = parseInt(
+    process.env.FFMPEG_PROGRESS_INTERVAL_MS || '1500',
+    10,
+  );
+
   return new Promise<void>((resolve, reject) => {
+    let last = 0;
     cmd
-      .on('start', (cmdline: string) => console.log('[ffmpeg] start:', cmdline))
+      .on('start', (cmdline: string) => {
+        ffmpegLog.info({ cmdline }, 'ffmpeg start');
+      })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .on('progress', (p: any) =>
-        console.log('[ffmpeg] progress', p?.timemark ?? ''),
-      )
-      .on('end', (_stdout: string | null, _stderr: string | null) => resolve())
-      .on('error', (err: Error) => reject(err))
+      .on('progress', (p: any) => {
+        const now = Date.now();
+        if (now - last > intervalMs) {
+          last = now;
+          ffmpegLog.info(
+            { timemark: p?.timemark ?? undefined, percent: p?.percent },
+            'ffmpeg progress',
+          );
+        }
+      })
+      .on('end', (_stdout: string | null, _stderr: string | null) => {
+        ffmpegLog.info('ffmpeg end');
+        resolve();
+      })
+      .on('error', (err: Error) => {
+        ffmpegLog.error({ error: err.message }, 'ffmpeg error');
+        reject(err);
+      })
       .run();
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (cmd as any).on?.('stderr', (line: string) => {
-      if (process.env.FFMPEG_VERBOSE) console.log('[ffmpeg]', line);
+      if (process.env.FFMPEG_VERBOSE)
+        ffmpegLog.debug({ line }, 'ffmpeg stderr');
     });
   });
 }
@@ -94,7 +121,7 @@ async function generateVideoPosterFrame(
       '-q:v',
       '80',
       '-vf',
-      `scale=${width}:-1:force_original_aspect_ratio=decrease`, // 가로 기준 맞추기
+      `scale=${width}:-1:force_original_aspect_ratio=decrease`,
     ])
     .output(outPath);
   await runFfmpeg(cmd);
@@ -106,10 +133,10 @@ async function generateAudioPoster(
   width: number,
   outPath: string,
 ) {
-  const height = Math.round((width * 16) / 9); // 9:16 세로 비율로 맞춤
+  const height = Math.round((width * 16) / 9); // 9:16 세로 비율
   try {
     const cmd = ffmpeg(input)
-      .complexFilter([`showspectrumpic=s=${width}x${height}:legend=disabled`]) // 스펙트럼 이미지
+      .complexFilter([`showspectrumpic=s=${width}x${height}:legend=disabled`])
       .frames(1)
       .videoCodec('libwebp')
       .outputOptions(['-q:v', '80'])
@@ -140,8 +167,8 @@ export async function transcodeToHLSAndThumbnails(
 }> {
   const segment = parseInt(process.env.HLS_SEGMENT_SECONDS || '6', 10);
   const outPrefix = process.env.HLS_OUTPUT_PREFIX || 'hls';
-  const thumbPrefix = process.env.THUMB_OUTPUT_PREFIX || 'thumbs'; // [ADDED] 썸네일 업로드 prefix
-  const thumbWidths = (process.env.THUMB_WIDTHS || '360,540,720') // [ADDED] 사이즈 세트
+  const thumbPrefix = process.env.THUMB_OUTPUT_PREFIX || 'thumbs';
+  const thumbWidths = (process.env.THUMB_WIDTHS || '360,540,720')
     .split(',')
     .map((s) => parseInt(s.trim(), 10))
     .filter((n) => Number.isFinite(n) && n > 0);
@@ -149,18 +176,29 @@ export async function transcodeToHLSAndThumbnails(
   const work = mkdtempSync(join(tmpdir(), `hls-${mediaId}-`));
   const input = join(work, 'input');
   const outDir = join(work, 'out');
-  const thumbDir = join(work, 'thumbs'); // [ADDED]
+  const thumbDir = join(work, 'thumbs');
   mkdirSync(outDir, { recursive: true });
-  mkdirSync(thumbDir, { recursive: true }); // [ADDED]
+  mkdirSync(thumbDir, { recursive: true });
 
   const kind = inferKind(contentType, srcKey);
-  console.log(
-    `[transcode] mediaId=${mediaId} kind=${kind} ct=${contentType ?? '(none)'} srcKey=${srcKey}`,
+  const log = logger.child({ mediaId, kind });
+
+  log.info(
+    {
+      srcKey,
+      contentType: contentType ?? null,
+      segment,
+      outPrefix,
+      thumbPrefix,
+      thumbWidths,
+    },
+    'transcode start',
   );
 
   try {
     // 1) 원본 다운로드
     await downloadToFile(srcKey, input);
+    log.info({ input }, 'downloaded');
 
     // 2) FFmpeg → HLS
     const cmd = ffmpeg(input).output(join(outDir, 'index.m3u8'));
@@ -212,16 +250,19 @@ export async function transcodeToHLSAndThumbnails(
         break;
       case 'unknown':
       default:
+        log.error({ contentType, ext: extname(srcKey) }, 'unsupported kind');
         throw new Error(
           `Unsupported contentType/ext for HLS: contentType=${contentType ?? 'N/A'}, srcKeyExt=${extname(srcKey)}`,
         );
     }
+    log.info('hls encode start');
     await runFfmpeg(cmd);
+    log.info('hls encode done');
 
     // 3) 업로드 (hls/<id>/…)
     const destPrefix = `${outPrefix}/${mediaId}`;
     await uploadDir(destPrefix, outDir);
-    console.log(`[transcode] uploaded to s3 prefix=${destPrefix}/`);
+    log.info({ destPrefix }, 'hls uploaded');
 
     // 4) 썸네일 생성 (poster_360/540/720.webp)
     let poster540 = '';
@@ -234,8 +275,10 @@ export async function transcodeToHLSAndThumbnails(
             ? Math.max(0, Math.min(duration * 0.1, Math.max(duration - 0.2, 0)))
             : 0; // 10% 지점(백업: 0s)
         await generateVideoPosterFrame(input, t, w, outPath);
+        log.info({ width: w, at: t, outPath }, 'poster frame generated');
       } else {
         await generateAudioPoster(input, w, outPath);
+        log.info({ width: w, outPath }, 'audio poster generated');
       }
       if (w === 540) poster540 = outPath;
     }
@@ -243,13 +286,23 @@ export async function transcodeToHLSAndThumbnails(
     // 5) 썸네일 업로드 (thumbs/<id>/…)
     const thumbDestPrefix = `${thumbPrefix}/${mediaId}`;
     await uploadDir(thumbDestPrefix, thumbDir);
-    console.log(`[thumbs] uploaded to s3 prefix=${thumbDestPrefix}/`);
+    log.info({ thumbDestPrefix }, 'thumbs uploaded');
 
     // 6) 대표(540) 크기 측정 → 리턴
     const dim = poster540 ? await getImageSize(poster540) : null;
     const width = dim?.width ?? 540;
     const height = dim?.height ?? Math.round((540 * 16) / 9);
     const thumbnailKey = `${thumbDestPrefix}/poster_540.webp`;
+
+    log.info(
+      {
+        hlsKey: `${destPrefix}/index.m3u8`,
+        thumbnailKey,
+        thumbnailWidth: width,
+        thumbnailHeight: height,
+      },
+      'transcode done',
+    );
 
     return {
       hlsKey: `${destPrefix}/index.m3u8`,
@@ -261,6 +314,9 @@ export async function transcodeToHLSAndThumbnails(
     // 7) 임시 정리
     try {
       rmSync(work, { recursive: true, force: true });
-    } catch {}
+      logger.debug({ mediaId, work }, 'tmp cleaned');
+    } catch {
+      // 청소 실패는 치명적이지 않으므로 무시
+    }
   }
 }
