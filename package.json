@@ -22,6 +22,7 @@
     "@types/mime-types": "^3.0.1",
     "autoprefixer": "^10.4.21",
     "dotenv-cli": "^10.0.0",
+    "pino-pretty": "^13.1.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.12",
     "tsx": "^4.20.5"
