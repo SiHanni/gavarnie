@@ -1,5 +1,5 @@
 {
-  "name": "@gavarnie/entities",
+  "name": "@catarie/entities",
   "version": "0.1.0",
   "type": "commonjs",
   "main": "dist/index.js",

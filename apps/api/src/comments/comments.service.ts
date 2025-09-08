@@ -5,8 +5,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Comment, Media, MediaCore, User } from '@gavarnie/entities';
-import { CommentReaction } from '@gavarnie/entities';
+import { Comment, Media, MediaCore, User } from '@catarie/entities';
+import { CommentReaction } from '@catarie/entities';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import {
   ListCommentsResponseDto,

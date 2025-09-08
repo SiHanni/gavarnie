@@ -6,7 +6,7 @@ import {
   MediaCore,
   MediaReaction,
   User,
-} from '@gavarnie/entities';
+} from '@catarie/entities';
 import { MediaService } from './media.service';
 import { UploadsController } from './uploads/uploads.controller';
 import { S3Module } from '../storage/s3.module';

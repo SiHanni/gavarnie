@@ -7,7 +7,7 @@ import {
   MediaReaction,
   User,
   UserFollows,
-} from '@gavarnie/entities';
+} from '@catarie/entities';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 

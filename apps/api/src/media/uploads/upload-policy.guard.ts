@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
-import { User, MediaCore } from '@gavarnie/entities';
+import { User, MediaCore } from '@catarie/entities';
 import { UPLOAD_POLICY, kstDayRange, UserGrade } from './upload-policy';
 
 @Injectable()

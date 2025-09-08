@@ -25,6 +25,7 @@ apps/*/.env
 apps/*/.env.*
 web/.env
 web/.env.*
+lib/.env.*
 
 # 예시 파일은 커밋 허용
 !*.example

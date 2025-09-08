@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Comment, CommentReaction } from '@gavarnie/entities';
+import { Comment, CommentReaction } from '@catarie/entities';
 
 @Injectable()
 export class CommentReactionsService {

@@ -2,7 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FollowController } from './follow.controller';
 import { FollowService } from './follow.service';
-import { User, UserFollows } from '@gavarnie/entities';
+import { User, UserFollows } from '@catarie/entities';
 import { UsersModule } from '../users/users.module';
 
 @Module({

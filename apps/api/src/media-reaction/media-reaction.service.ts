@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { MediaCore } from '@gavarnie/entities';
-import { MediaReaction } from '@gavarnie/entities';
+import { MediaCore } from '@catarie/entities';
+import { MediaReaction } from '@catarie/entities';
 
 @Injectable()
 export class MediaReactionService {

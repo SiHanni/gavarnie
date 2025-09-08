@@ -10,12 +10,12 @@
 - 사용 명령어:
 
 ```
-yarn workspace @gavarnie/api upload:test -- /ABS/PATH/TO/file.mp4 --email user@example.com --password secret1234 --kind video --api http://localhost:3000
+yarn workspace @catarie/api upload:test -- /ABS/PATH/TO/file.mp4 --email user@example.com --password secret1234 --kind video --api http://localhost:3000
 ```
 
 ```
 예시
-yarn workspace @gavarnie/api upload:test -- '/Users/sihwanlee/Downloads/f1-radio.mp3' \
+yarn workspace @catarie/api upload:test -- '/Users/sihwanlee/Downloads/f1-radio.mp3' \
   --email user@example.com \
   --password secret1234 \
   --api http://localhost:3000

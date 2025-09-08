@@ -8,24 +8,62 @@ import { logger } from './logging/logging';
 
 const pipe = promisify(pipeline);
 
-// ENV에서만 값 사용 (임의 추가 없음)
-const BUCKET = process.env.STORAGE_BUCKET || 'media';
+// ---- helpers ----
+const bool = (v: any) => String(v).toLowerCase() === 'true';
+const required = (name: string) => {
+  const v = process.env[name];
+  if (!v) throw new Error(`[s3] missing env: ${name}`);
+  return v;
+};
+const getBucket = () => process.env.STORAGE_BUCKET || 'media';
 
-export const s3 = new S3Client({
-  region: process.env.STORAGE_REGION,
-  endpoint: process.env.STORAGE_ENDPOINT,
-  credentials: {
-    accessKeyId: process.env.STORAGE_ACCESS_KEY || '',
-    secretAccessKey: process.env.STORAGE_SECRET_KEY || '',
+// ---- lazy S3 client ----
+let _s3Real: S3Client | null = null;
+function createS3(): S3Client {
+  const endpoint = required('STORAGE_ENDPOINT'); // ex) http://localhost:19000
+  const region = process.env.STORAGE_REGION || 'us-east-1';
+  const accessKeyId = required('STORAGE_ACCESS_KEY');
+  const secretAccessKey = required('STORAGE_SECRET_KEY');
+  const forcePathStyle = bool(process.env.STORAGE_FORCE_PATH_STYLE ?? 'true');
+
+  logger.info(
+    { mod: 's3', endpoint, region, forcePathStyle },
+    '[s3] init client',
+  );
+
+  return new S3Client({
+    region,
+    endpoint,
+    credentials: { accessKeyId, secretAccessKey },
+    forcePathStyle, // ✅ MinIO 필수
+  });
+}
+function getS3Real(): S3Client {
+  if (_s3Real) return _s3Real;
+  _s3Real = createS3();
+  return _s3Real;
+}
+
+/**
+ * 외부 API 호환을 위해 s3 변수는 유지하되,
+ * 실제 접근 시점에 getS3Real()로 위임하는 Proxy를 사용
+ */
+export const s3 = new Proxy({} as unknown as S3Client, {
+  get(_target, prop, _recv) {
+    const real = getS3Real();
+    // @ts-ignore
+    return real[prop];
   },
-  forcePathStyle:
-    String(process.env.STORAGE_FORCE_PATH_STYLE || 'true') === 'true',
-});
+}) as unknown as S3Client;
 
+// ---- logging child ----
 const s3log = logger.child({ mod: 's3' });
 
+// ---- public API (그대로 유지) ----
 export async function downloadToFile(key: string, toPath: string) {
-  const obj = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  const obj = await s3.send(
+    new GetObjectCommand({ Bucket: getBucket(), Key: key }),
+  );
   s3log.info(
     {
       key,
@@ -47,7 +85,6 @@ function guessContentType(file: string) {
   if (ext === '.mp4') return 'video/mp4';
   if (ext === '.aac') return 'audio/aac';
   if (ext === '.mp3') return 'audio/mpeg';
-  // image
   if (ext === '.webp') return 'image/webp';
   if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
   if (ext === '.png') return 'image/png';
@@ -72,9 +109,9 @@ export async function uploadDir(prefixKey: string, dir: string) {
     const ContentType = guessContentType(f);
 
     const uploader = new Upload({
-      client: s3,
+      client: s3, // ← Proxy가 실제 S3Client로 위임
       params: {
-        Bucket: BUCKET,
+        Bucket: getBucket(),
         Key: `${prefixKey}/${f}`,
         Body: createReadStream(p),
         ContentType,
@@ -83,7 +120,6 @@ export async function uploadDir(prefixKey: string, dir: string) {
       partSize: 8 * 1024 * 1024,
     });
 
-    // 상세 진행률 로그는 선택적으로만 기록 (스팸 방지)
     if (process.env.S3_VERBOSE) {
       let last = 0;
       uploader.on('httpUploadProgress', (prog: any) => {

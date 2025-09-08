@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User, UserFollows } from '@gavarnie/entities';
+import { User, UserFollows } from '@catarie/entities';
 
 export type FollowActionResult = {
   following: boolean;

@@ -1,7 +1,7 @@
 # Dev Infra (Docker Compose)
 
 이 프로젝트는 로컬 개발을 위한 데이터/스토리지/프록시 인프라를 Docker Compose로 구성합니다.  
-아래의 서비스를 한 번에 띄워 **동영상/음원 스트리밍 토이 프로젝트(gavarnie)** 를 빠르게 개발·테스트할 수 있습니다.
+아래의 서비스를 한 번에 띄워 **동영상/음원 스트리밍 토이 프로젝트(catarie)** 를 빠르게 개발·테스트할 수 있습니다.
 
 ## 구성 요약
 
@@ -25,7 +25,7 @@
 - **역할**: 관계형 데이터 저장소. 사용자/게시물/권한 등 **코어 도메인** 메타데이터를 정규화하여 보관.
 - **환경변수**
   - `MYSQL_ROOT_PASSWORD=root` : root 계정 비밀번호
-  - `MYSQL_DATABASE=gavarnie_core` : 최초 생성 DB 이름
+  - `MYSQL_DATABASE=catarie_core` : 최초 생성 DB 이름
 - **포트 매핑**: `13306:3306` → 로컬에서 `127.0.0.1:13306` 으로 접속
 - **초기 스크립트**: `./mysql/init.sql` 이 컨테이너 시작 시 자동 실행  
   (`/docker-entrypoint-initdb.d/init.sql` 로 마운트, read-only)
@@ -35,23 +35,13 @@
   mysql -h 127.0.0.1 -P 13306 -u root -proot
   # DB 확인
   SHOW DATABASES;
-  USE gavarnie_core;
+  USE catarie_core;
   ```
 - **유즈케이스**
   - 계정/권한/팔로우/좋아요 등 정합성 필요한 데이터
   - 트랜잭션 보장이 필요한 핵심 테이블
 
 ---
-
-### 2) MongoDB (`mongo:6`)
-
-- **역할**: 스키마가 유연한 도큐먼트 저장소. **이벤트 로그**, **메타정보**, **스키마가 빈번히 변하는 데이터**에 적합.
-- **포트 매핑**: `27018:27017`
-- **접속 예시**
-  ```bash
-  mongosh "mongodb://127.0.0.1:27018"
-  show dbs
-  ```
 
 ---
 
@@ -164,7 +154,6 @@ docker compose down -v           # 볼륨까지 삭제(데이터 초기화)
   `ERROR 2002 (HY000): Can't connect to local MySQL server through socket ...` 같은 소켓 오류는 `-h 127.0.0.1 -P 13306` 으로 우회됩니다.
 
 - **MinIO 콘솔 접속 불가**
-
   1. 컨테이너 상태 확인: `docker compose ps`
   2. 로그 확인: `docker compose logs -f minio`
   3. 포트 충돌 확인: `lsof -iTCP:19000 -sTCP:LISTEN`

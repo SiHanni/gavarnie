@@ -11,7 +11,7 @@ import {
   MediaReaction,
   User,
   UserFollows,
-} from '@gavarnie/entities';
+} from '@catarie/entities';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { MediaReactionModule } from './media-reaction/media-reaction.module';
@@ -22,12 +22,18 @@ import { AvatarsModule } from './avatars/avatars.module';
 
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ApiRequestContextInterceptor } from './logging/request-context.interceptor';
+import path from 'path';
 
+const ENV = process.env.NODE_ENV || 'development';
+const envFilePath = [
+  path.join(__dirname, '..', '..', '..', `.env.common.${ENV}`), // 루트 공통
+  path.join(__dirname, '..', `.env.${ENV}`), // apps/api 전용
+];
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [`.env.${process.env.NODE_ENV}`],
+      envFilePath,
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => ({

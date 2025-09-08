@@ -8,7 +8,7 @@
  * 5) GET /uploads/media/:id/status  → 상태 조회 (선택)
  *
  * Usage:
- *  yarn workspace @gavarnie/api upload:test -- /ABS/PATH/TO/file.mp4 --email user@example.com --password secret1234 --kind video --api http://localhost:3000
+ *  yarn workspace @catarie/api upload:test -- /ABS/PATH/TO/file.mp4 --email user@example.com --password secret1234 --kind video --api http://localhost:3000
  *
  * Requires: Node.js 18+ (global fetch). Adds dependency "mime-types".
  *
