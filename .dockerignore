@@ -15,3 +15,5 @@ Dockerfile
 
 # build outputs
 **/dist
+!apps/**/dist
+!libs/**/dist
