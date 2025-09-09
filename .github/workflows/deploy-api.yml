@@ -2,29 +2,29 @@ name: Deploy API (release)
 on:
   workflow_dispatch:
   push:
-    branches: [ release ]
+    branches: [release]
     paths:
-      - "apps/api/**"
-      - "libs/**"
-      - "web/package.json"
-      - "package.json"
-      - "yarn.lock"
-      - ".yarnrc.yml"
-      - ".yarn/**"
-      - ".github/workflows/deploy-api.yml"
+      - 'apps/api/**'
+      - 'libs/**'
+      - 'web/package.json'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.yarnrc.yml'
+      - '.yarn/**'
+      - '.github/workflows/deploy-api.yml'
 env: { IMAGE_TAG: prod }
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions: { id-token: write, contents: read }
     env:
-      AWS_ACCOUNT_ID:     ${{ secrets.AWS_ACCOUNT_ID }}
-      AWS_REGION:         ${{ secrets.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-      ECR_REPO:           ${{ secrets.ECR_REPO_API }}      # ex: catarie/api
-      CLUSTER:            ${{ secrets.ECS_CLUSTER }}       # ex: catarie-prod-cluster
-      SERVICE:            ${{ secrets.ECS_SERVICE_API }}   # ex: api-task-service
-      REGISTRY:           ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      ECR_REPO: ${{ secrets.ECR_REPO_API }} # ex: catarie/api
+      CLUSTER: ${{ secrets.ECS_CLUSTER }} # ex: catarie-prod-cluster
+      SERVICE: ${{ secrets.ECS_SERVICE_API }} # ex: api-task-service
+      REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
     steps:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
