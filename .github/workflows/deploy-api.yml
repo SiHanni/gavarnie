@@ -80,29 +80,52 @@ jobs:
 
       # 6) 마이그레이션 실행 (ECS 원오프 태스크, tsx로 TS 소스 실행)
       - name: Run DB migrations (one-off ECS task)
+        env:
+          CLUSTER: ${{ secrets.ECS_CLUSTER }}
+          SERVICE: ${{ secrets.ECS_SERVICE_API }}
+          CONTAINER_NAME: ${{ secrets.CONTAINER_NAME_API }}
         run: |
           set -e
+
+          # 서비스가 쓰는 태스크 정의 ARN
           TD=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
                --query 'services[0].taskDefinition' --output text)
 
-          # 서비스의 네트워크 설정을 그대로 가져온다 (awsvpcConfiguration)
-          NET_JSON=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
-               --query 'services[0].networkConfiguration.awsvpcConfiguration' --output json)
+          # 태스크 정의의 네트워크 모드 확인: awsvpc / bridge / host / none
+          NMODE=$(aws ecs describe-task-definition --task-definition "$TD" \
+                  --query 'taskDefinition.networkMode' --output text)
+          echo "networkMode=$NMODE"
 
-          SUBNETS=$(echo "$NET_JSON" | jq -r '.subnets | join(",")')
-          SGRPS=$(echo "$NET_JSON" | jq -r '.securityGroups | join(",")')
-          PUBIP=$(echo "$NET_JSON" | jq -r '.assignPublicIp // "DISABLED"')
+          if [ "$NMODE" = "awsvpc" ]; then
+            # 서비스에 설정된 서브넷/SG 그대로 사용
+            NET_JSON=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+              --query 'services[0].networkConfiguration.awsvpcConfiguration' --output json)
 
-          ARN=$(aws ecs run-task --cluster "$CLUSTER" --launch-type EC2 \
-            --task-definition "$TD" --count 1 \
-            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SGRPS],assignPublicIp=$PUBIP}" \
-            --overrides '{"containerOverrides":[{"name":"'"$CONTAINER_NAME"'","command":["/bin/sh","-lc","/app/node_modules/.bin/tsx libs/migrations/src/runner/run.ts"]}]}' \
-            --query 'tasks[0].taskArn' --output text)
+            SUBNETS=$(echo "$NET_JSON" | jq -r '.subnets | join(",")')
+            SGRPS=$(echo "$NET_JSON" | jq -r '.securityGroups | join(",")')
+            PUBIP=$(echo "$NET_JSON" | jq -r '.assignPublicIp // "DISABLED"')
+
+            RUN_OUT=$(aws ecs run-task --cluster "$CLUSTER" --launch-type EC2 \
+              --task-definition "$TD" --count 1 \
+              --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SGRPS],assignPublicIp=$PUBIP}" \
+              --overrides '{"containerOverrides":[{"name":"'"$CONTAINER_NAME"'","command":["/bin/sh","-lc","/app/node_modules/.bin/tsx libs/migrations/src/runner/run.ts"]}]}' \
+              --output json)
+          else
+            # bridge/host/none → 네트워크 설정 없이 실행
+            RUN_OUT=$(aws ecs run-task --cluster "$CLUSTER" --launch-type EC2 \
+              --task-definition "$TD" --count 1 \
+              --overrides '{"containerOverrides":[{"name":"'"$CONTAINER_NAME"'","command":["/bin/sh","-lc","/app/node_modules/.bin/tsx libs/migrations/src/runner/run.ts"]}]}' \
+              --output json)
+          fi
+
+          ARN=$(echo "$RUN_OUT" | jq -r '.tasks[0].taskArn')
+          echo "Started task: $ARN"
 
           aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$ARN"
 
           CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$ARN" \
-            --query 'tasks[0].containers[?name==`'"$CONTAINER_NAME"'`].exitCode | [0]' --output text)
+            --query 'tasks[0].containers[?name==`'"$CONTAINER_NAME"'`].exitCode | [0]' \
+            --output text)
 
           echo "Migration exit code: $CODE"
           [ "$CODE" = "0" ] || (echo "Migration failed ($CODE)"; exit 1)
