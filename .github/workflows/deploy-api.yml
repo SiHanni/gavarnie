@@ -24,23 +24,21 @@ jobs:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-      ECR_REPO: ${{ secrets.ECR_REPO_API }} # ex: catarie/api
-      CLUSTER: ${{ secrets.ECS_CLUSTER }} # ex: 실제 클러스터명
-      SERVICE: ${{ secrets.ECS_SERVICE_API }} # ex: api-task-service
-      CONTAINER_NAME: ${{ secrets.CONTAINER_NAME_API }} # ex: api
+      ECR_REPO: ${{ secrets.ECR_REPO_API }}
+      CLUSTER: ${{ secrets.ECS_CLUSTER }}
+      SERVICE: ${{ secrets.ECS_SERVICE_API }}
+      CONTAINER_NAME: ${{ secrets.CONTAINER_NAME_API }}
       REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
     steps:
       - uses: actions/checkout@v4
 
-      # 1) AWS OIDC
       - name: Configure AWS (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 2) Yarn v4 설치/의존성 설치
       - name: Setup Yarn v4 & install
         run: |
           set -e
@@ -49,7 +47,6 @@ jobs:
           yarn --version
           yarn install --immutable --inline-builds
 
-      # 3) dist 생성 (migrations는 TSX로 실행하므로 빌드 불필요)
       - name: Build TypeScript (dist 생성)
         run: |
           set -e
@@ -57,7 +54,6 @@ jobs:
           yarn --cwd libs/logging build
           yarn --cwd apps/api build
 
-      # 4) ECR 보장 & 로그인
       - name: Ensure ECR repo exists
         run: |
           aws ecr describe-repositories --repository-names "${ECR_REPO}" >/dev/null 2>&1 || \
@@ -66,7 +62,6 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 5) Docker 빌드/푸시 (루트 컨텍스트)
       - name: Build API image (root context)
         run: |
           set -e
@@ -78,106 +73,5 @@ jobs:
       - name: Push API image
         run: docker push ${REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
 
-      # 6) 마이그레이션 실행 (ECS 원오프 태스크, tsx로 TS 소스 실행)
-      - name: Run DB migrations (one-off ECS task, with fresh TD)
-        env:
-          CLUSTER: ${{ secrets.ECS_CLUSTER }}
-          SERVICE: ${{ secrets.ECS_SERVICE_API }}
-          CONTAINER_NAME: ${{ secrets.CONTAINER_NAME_API }} # 비워두면 0번 컨테이너 자동
-          IMAGE_URI: ${{ env.REGISTRY }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}
-        run: |
-          set -e
-
-          TD=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
-               --query 'services[0].taskDefinition' --output text)
-          NMODE=$(aws ecs describe-task-definition --task-definition "$TD" \
-               --query 'taskDefinition.networkMode' --output text)
-
-          # 컨테이너 이름 자동 추론(비었으면 0번)
-          if [ -z "${CONTAINER_NAME:-}" ] || [ "${CONTAINER_NAME}" = "null" ]; then
-            CNAME=$(aws ecs describe-task-definition --task-definition "$TD" \
-                    --query 'taskDefinition.containerDefinitions[0].name' --output text)
-          else
-            CNAME="$CONTAINER_NAME"
-          fi
-          echo "baseTD=$TD  container=$CNAME  networkMode=$NMODE"
-
-          # 원본 TD 저장(전체 JSON)
-          aws ecs describe-task-definition --task-definition "$TD" \
-            --output json > td-full.json
-
-          # 대상 컨테이너 이름 일치 여부
-          MATCH=$(jq -r --arg CN "$CNAME" '[.taskDefinition.containerDefinitions[] | select(.name==$CN)] | length' td-full.json)
-
-          # 새 TD 입력 생성(이미지 강제 치환)
-          if [ "$MATCH" -gt 0 ]; then
-            jq --arg IMG "$IMAGE_URI" --arg CN "$CNAME" '
-              .taskDefinition as $td
-              | $td
-              | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
-              | .containerDefinitions = (.containerDefinitions | map(if .name==$CN then (.image=$IMG) else . end))
-              | {family,taskRoleArn,executionRoleArn,networkMode,containerDefinitions,volumes,placementConstraints,requiresCompatibilities,cpu,memory,runtimePlatform,proxyConfiguration,inferenceAccelerators,ephemeralStorage}
-              | del(..|nulls)
-            ' td-full.json > td-new.json
-          else
-            jq --arg IMG "$IMAGE_URI" '
-              .taskDefinition as $td
-              | $td
-              | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
-              | .containerDefinitions = (.containerDefinitions | (.[0].image = $IMG | .))
-              | {family,taskRoleArn,executionRoleArn,networkMode,containerDefinitions,volumes,placementConstraints,requiresCompatibilities,cpu,memory,runtimePlatform,proxyConfiguration,inferenceAccelerators,ephemeralStorage}
-              | del(..|nulls)
-            ' td-full.json > td-new.json
-          fi
-
-          echo "Images after replace:"
-          jq -r '.containerDefinitions[] | "\(.name): \(.image)"' td-new.json
-
-          NEW_TD=$(aws ecs register-task-definition --cli-input-json file://td-new.json \
-                   --query 'taskDefinition.taskDefinitionArn' --output text)
-          echo "newTD=$NEW_TD"
-
-          # 네트워크 설정(awsvpc만 필요)
-          if [ "$NMODE" = "awsvpc" ]; then
-            NET_JSON=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
-                         --query 'services[0].networkConfiguration.awsvpcConfiguration' --output json)
-            SUBNETS=$(echo "$NET_JSON" | jq -r '.subnets | join(",")')
-            SGRPS=$(echo "$NET_JSON" | jq -r '.securityGroups | join(",")')
-            PUBIP=$(echo "$NET_JSON" | jq -r '.assignPublicIp // "DISABLED"')
-            NETCFG="awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SGRPS],assignPublicIp=$PUBIP}"
-          else
-            NETCFG=""
-          fi
-
-          # 네가 쓰던 명령 그대로 (Yarn v4 활성화 → migrate:run)
-          OVR=$(jq -n --arg n "$CNAME" --arg cmd 'corepack enable && corepack prepare yarn@4.9.3 --activate && yarn workspace @catarie/migrations migrate:run' \
-                '{containerOverrides:[{name:$n,command:["/bin/sh","-lc",$cmd]}]}')
-
-          if [ -n "$NETCFG" ]; then
-            RUN_OUT=$(aws ecs run-task --cluster "$CLUSTER" --launch-type EC2 \
-              --task-definition "$NEW_TD" --count 1 \
-              --network-configuration "$NETCFG" \
-              --overrides "$OVR" --started-by "gh-actions-migration" --output json)
-          else
-            RUN_OUT=$(aws ecs run-task --cluster "$CLUSTER" --launch-type EC2 \
-              --task-definition "$NEW_TD" --count 1 \
-              --overrides "$OVR" --started-by "gh-actions-migration" --output json)
-          fi
-
-          ARN=$(echo "$RUN_OUT" | jq -r '.tasks[0].taskArn')
-          echo "Started task: $ARN"
-
-          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$ARN"
-          DESCR=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$ARN" --output json)
-          echo "$DESCR" | jq -r '.tasks[0].containers[] | {name:.name,image:.image,lastStatus:.lastStatus,reason:.reason,exitCode:.exitCode}'
-
-          CODE=$(echo "$DESCR" | jq -r --arg n "$CNAME" \
-            '[.tasks[0].containers[] | select(.name==$n) | .exitCode][0]')
-          [ "$CODE" = "0" ] || (echo "Migration failed (${CODE:-N/A})"; exit 1)
-
-          # 서비스도 방금 리비전으로 교체
-          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$NEW_TD"
-
-      # 7) 서비스 재배포
       - name: Force new deployment
         run: aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --force-new-deployment

@@ -24,9 +24,9 @@ jobs:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-      ECR_REPO: ${{ secrets.ECR_REPO_WORKER }} # ex: catarie/worker
+      ECR_REPO: ${{ secrets.ECR_REPO_WORKER }}
       CLUSTER: ${{ secrets.ECS_CLUSTER }}
-      SERVICE: ${{ secrets.ECS_SERVICE_WORKER }} # ex: worker-task-service
+      SERVICE: ${{ secrets.ECS_SERVICE_WORKER }}
       REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
     steps:
