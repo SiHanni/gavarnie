@@ -3,7 +3,7 @@
 # ── Prod deps only (Yarn v4) ───────────────────────────────────────────
 FROM node:20-alpine AS proddeps
 WORKDIR /app
-RUN corepack enable && corepack prepare yarn@4.9.3 --activate
+RUN apk add --no-cache ca-certificates && corepack enable && corepack prepare yarn@4.9.3 --activate
 COPY .yarnrc.yml ./
 COPY package.json yarn.lock ./
 COPY apps/worker/package.json apps/worker/

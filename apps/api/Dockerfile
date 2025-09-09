@@ -4,7 +4,7 @@
 FROM node:20-alpine AS proddeps
 WORKDIR /app
 # Yarn v4 고정
-RUN corepack enable && corepack prepare yarn@4.9.3 --activate
+RUN apk add --no-cache ca-certificates && corepack enable && corepack prepare yarn@4.9.3 --activate
 # Yarn 설정(노드모듈 모드) 반영
 COPY .yarnrc.yml ./
 # 루트/필요 워크스페이스 매니페스트만 복사
