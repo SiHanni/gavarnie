@@ -16,11 +16,16 @@ COPY libs/migrations/package.json libs/migrations/
 COPY web/package.json web/
 RUN yarn install --immutable --inline-builds && yarn cache clean
 
+# ---------- build ----------
 FROM deps AS build
 WORKDIR /repo
 COPY . .
-RUN yarn workspaces foreach -A -tv run build || true
-# RUN yarn --cwd libs/entities build && yarn --cwd libs/logging build && yarn --cwd libs/migrations build && yarn --cwd apps/worker build
+
+RUN yarn workspace @catarie/entities build \
+ && yarn workspace @catarie/logging build \
+ && (yarn workspace @catarie/migrations build || true) \
+ && yarn workspace @catarie/worker build
+    
 
 FROM base AS proddeps
 WORKDIR /repo

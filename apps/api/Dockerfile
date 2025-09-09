@@ -26,10 +26,13 @@
     FROM deps AS build
     WORKDIR /repo
     COPY . .
-    # 워크스페이스 전역 빌드 (각 패키지에 build 스크립트 있다고 가정)
-    RUN yarn workspaces foreach -A -tv run build || true
-    # (필요 시) 개별: RUN yarn --cwd libs/entities build && yarn --cwd libs/logging build && yarn --cwd libs/migrations build && yarn --cwd apps/api build
-    
+
+    # 필요한 워크스페이스를 확실히 빌드 (dist 생성 보장)
+    RUN yarn workspace @catarie/entities build \
+     && yarn workspace @catarie/logging build \
+     && (yarn workspace @catarie/migrations build || true) \
+     && yarn workspace @catarie/api build
+     
     # ---------- proddeps (production only) ----------
     FROM base AS proddeps
     WORKDIR /repo
