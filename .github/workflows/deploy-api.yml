@@ -85,16 +85,24 @@ jobs:
           TD=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
                --query 'services[0].taskDefinition' --output text)
 
+          # 서비스의 네트워크 설정을 그대로 가져온다 (awsvpcConfiguration)
+          NET_JSON=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+               --query 'services[0].networkConfiguration.awsvpcConfiguration' --output json)
+
+          SUBNETS=$(echo "$NET_JSON" | jq -r '.subnets | join(",")')
+          SGRPS=$(echo "$NET_JSON" | jq -r '.securityGroups | join(",")')
+          PUBIP=$(echo "$NET_JSON" | jq -r '.assignPublicIp // "DISABLED"')
+
           ARN=$(aws ecs run-task --cluster "$CLUSTER" --launch-type EC2 \
             --task-definition "$TD" --count 1 \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SGRPS],assignPublicIp=$PUBIP}" \
             --overrides '{"containerOverrides":[{"name":"'"$CONTAINER_NAME"'","command":["/bin/sh","-lc","/app/node_modules/.bin/tsx libs/migrations/src/runner/run.ts"]}]}' \
             --query 'tasks[0].taskArn' --output text)
 
           aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$ARN"
 
           CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$ARN" \
-            --query 'tasks[0].containers[?name==`'"$CONTAINER_NAME"'`].exitCode | [0]' \
-            --output text)
+            --query 'tasks[0].containers[?name==`'"$CONTAINER_NAME"'`].exitCode | [0]' --output text)
 
           echo "Migration exit code: $CODE"
           [ "$CODE" = "0" ] || (echo "Migration failed ($CODE)"; exit 1)
