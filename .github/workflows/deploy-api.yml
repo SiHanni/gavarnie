@@ -25,36 +25,39 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
       ECR_REPO: ${{ secrets.ECR_REPO_API }} # ex: catarie/api
-      CLUSTER: ${{ secrets.ECS_CLUSTER }} # ex: (정확한 클러스터명)
+      CLUSTER: ${{ secrets.ECS_CLUSTER }} # ex: 실제 클러스터명
       SERVICE: ${{ secrets.ECS_SERVICE_API }} # ex: api-task-service
+      CONTAINER_NAME: ${{ secrets.CONTAINER_NAME_API }} # ex: api
       REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
     steps:
       - uses: actions/checkout@v4
 
-      # 1) AWS OIDC 설정
+      # 1) AWS OIDC
       - name: Configure AWS (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 2) 로컬에서 먼저 설치/빌드 (Yarn v4)
+      # 2) Yarn v4 설치/의존성 설치
       - name: Setup Yarn v4 & install
         run: |
+          set -e
           corepack enable
           corepack prepare yarn@4.9.3 --activate
           yarn --version
           yarn install --immutable --inline-builds
 
+      # 3) dist 생성 (migrations는 TSX로 실행하므로 빌드 불필요)
       - name: Build TypeScript (dist 생성)
         run: |
+          set -e
           yarn --cwd libs/entities build
           yarn --cwd libs/logging build
-          (yarn --cwd libs/migrations build || true)
           yarn --cwd apps/api build
 
-      # 3) ECR 보장 & 로그인
+      # 4) ECR 보장 & 로그인
       - name: Ensure ECR repo exists
         run: |
           aws ecr describe-repositories --repository-names "${ECR_REPO}" >/dev/null 2>&1 || \
@@ -63,9 +66,10 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 4) Docker 빌드/푸시 (루트 컨텍스트)
+      # 5) Docker 빌드/푸시 (루트 컨텍스트)
       - name: Build API image (root context)
         run: |
+          set -e
           DOCKER_BUILDKIT=1 docker build --platform linux/amd64 \
             -f apps/api/Dockerfile \
             -t ${REGISTRY}/${ECR_REPO}:${IMAGE_TAG} \
@@ -74,6 +78,27 @@ jobs:
       - name: Push API image
         run: docker push ${REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
 
-      # 5) ECS 서비스 재배포
+      # 6) 마이그레이션 실행 (ECS 원오프 태스크, tsx로 TS 소스 실행)
+      - name: Run DB migrations (one-off ECS task)
+        run: |
+          set -e
+          TD=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+               --query 'services[0].taskDefinition' --output text)
+
+          ARN=$(aws ecs run-task --cluster "$CLUSTER" --launch-type EC2 \
+            --task-definition "$TD" --count 1 \
+            --overrides '{"containerOverrides":[{"name":"'"$CONTAINER_NAME"'","command":["/bin/sh","-lc","/app/node_modules/.bin/tsx libs/migrations/src/runner/run.ts"]}]}' \
+            --query 'tasks[0].taskArn' --output text)
+
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$ARN"
+
+          CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$ARN" \
+            --query 'tasks[0].containers[?name==`'"$CONTAINER_NAME"'`].exitCode | [0]' \
+            --output text)
+
+          echo "Migration exit code: $CODE"
+          [ "$CODE" = "0" ] || (echo "Migration failed ($CODE)"; exit 1)
+
+      # 7) 서비스 재배포
       - name: Force new deployment
         run: aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --force-new-deployment
