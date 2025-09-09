@@ -83,50 +83,61 @@ jobs:
         env:
           CLUSTER: ${{ secrets.ECS_CLUSTER }}
           SERVICE: ${{ secrets.ECS_SERVICE_API }}
-          CONTAINER_NAME: ${{ secrets.CONTAINER_NAME_API }}
+          CONTAINER_NAME: ${{ secrets.CONTAINER_NAME_API }} # 비워두면 0번 컨테이너 자동
           IMAGE_URI: ${{ env.REGISTRY }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}
         run: |
           set -e
 
-          # 1) 현재 TD/네트워크/컨테이너 이름
           TD=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
                --query 'services[0].taskDefinition' --output text)
           NMODE=$(aws ecs describe-task-definition --task-definition "$TD" \
                --query 'taskDefinition.networkMode' --output text)
-          [ -z "${CONTAINER_NAME:-}" ] || [ "${CONTAINER_NAME}" = "null" ] \
-            && CNAME=$(aws ecs describe-task-definition --task-definition "$TD" \
-                       --query 'taskDefinition.containerDefinitions[0].name' --output text) \
-            || CNAME="$CONTAINER_NAME"
+
+          # 컨테이너 이름 자동 추론(비었으면 0번)
+          if [ -z "${CONTAINER_NAME:-}" ] || [ "${CONTAINER_NAME}" = "null" ]; then
+            CNAME=$(aws ecs describe-task-definition --task-definition "$TD" \
+                    --query 'taskDefinition.containerDefinitions[0].name' --output text)
+          else
+            CNAME="$CONTAINER_NAME"
+          fi
           echo "baseTD=$TD  container=$CNAME  networkMode=$NMODE"
 
+          # 원본 TD 저장(전체 JSON)
           aws ecs describe-task-definition --task-definition "$TD" \
-            --query 'taskDefinition' --output json > td.json
+            --output json > td-full.json
 
-          # 2) 새 리비전(이미지 강제 치환: 매칭되면 해당 컨테이너, 없으면 0번 컨테이너)
-          jq --arg IMG "$IMAGE_URI" --arg CN "$CNAME" '
-            del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy) as $td
-            | ($td.containerDefinitions | any(.name==$CN)) as $has
-            | $td
-            | .containerDefinitions |= ( if $has
-                then map(if .name==$CN then (.image=$IMG) else . end)
-                else (.[0].image=$IMG | .)
-              )
-            | {
-                family, taskRoleArn, executionRoleArn, networkMode,
-                containerDefinitions, volumes, placementConstraints,
-                requiresCompatibilities, cpu, memory, runtimePlatform,
-                proxyConfiguration, inferenceAccelerators, ephemeralStorage
-              } | del(..|nulls)
-          ' td.json > td-new.json
+          # 대상 컨테이너 이름 일치 여부
+          MATCH=$(jq -r --arg CN "$CNAME" '[.taskDefinition.containerDefinitions[] | select(.name==$CN)] | length' td-full.json)
 
-          echo "Container images after replace:"
+          # 새 TD 입력 생성(이미지 강제 치환)
+          if [ "$MATCH" -gt 0 ]; then
+            jq --arg IMG "$IMAGE_URI" --arg CN "$CNAME" '
+              .taskDefinition as $td
+              | $td
+              | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+              | .containerDefinitions = (.containerDefinitions | map(if .name==$CN then (.image=$IMG) else . end))
+              | {family,taskRoleArn,executionRoleArn,networkMode,containerDefinitions,volumes,placementConstraints,requiresCompatibilities,cpu,memory,runtimePlatform,proxyConfiguration,inferenceAccelerators,ephemeralStorage}
+              | del(..|nulls)
+            ' td-full.json > td-new.json
+          else
+            jq --arg IMG "$IMAGE_URI" '
+              .taskDefinition as $td
+              | $td
+              | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+              | .containerDefinitions = (.containerDefinitions | (.[0].image = $IMG | .))
+              | {family,taskRoleArn,executionRoleArn,networkMode,containerDefinitions,volumes,placementConstraints,requiresCompatibilities,cpu,memory,runtimePlatform,proxyConfiguration,inferenceAccelerators,ephemeralStorage}
+              | del(..|nulls)
+            ' td-full.json > td-new.json
+          fi
+
+          echo "Images after replace:"
           jq -r '.containerDefinitions[] | "\(.name): \(.image)"' td-new.json
 
           NEW_TD=$(aws ecs register-task-definition --cli-input-json file://td-new.json \
                    --query 'taskDefinition.taskDefinitionArn' --output text)
           echo "newTD=$NEW_TD"
 
-          # 3) 네트워크 설정
+          # 네트워크 설정(awsvpc만 필요)
           if [ "$NMODE" = "awsvpc" ]; then
             NET_JSON=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
                          --query 'services[0].networkConfiguration.awsvpcConfiguration' --output json)
@@ -138,7 +149,7 @@ jobs:
             NETCFG=""
           fi
 
-          # 4) migrate:run (네가 쓰던 명령 그대로)
+          # 네가 쓰던 명령 그대로 (Yarn v4 활성화 → migrate:run)
           OVR=$(jq -n --arg n "$CNAME" --arg cmd 'corepack enable && corepack prepare yarn@4.9.3 --activate && yarn workspace @catarie/migrations migrate:run' \
                 '{containerOverrides:[{name:$n,command:["/bin/sh","-lc",$cmd]}]}')
 
@@ -157,7 +168,6 @@ jobs:
           echo "Started task: $ARN"
 
           aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$ARN"
-
           DESCR=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$ARN" --output json)
           echo "$DESCR" | jq -r '.tasks[0].containers[] | {name:.name,image:.image,lastStatus:.lastStatus,reason:.reason,exitCode:.exitCode}'
 
@@ -165,7 +175,7 @@ jobs:
             '[.tasks[0].containers[] | select(.name==$n) | .exitCode][0]')
           [ "$CODE" = "0" ] || (echo "Migration failed (${CODE:-N/A})"; exit 1)
 
-          # 5) 서비스도 방금 리비전으로
+          # 서비스도 방금 리비전으로 교체
           aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$NEW_TD"
 
       # 7) 서비스 재배포
