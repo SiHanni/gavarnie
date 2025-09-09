@@ -1,4 +1,4 @@
-name: Deploy API (release)
+name: Push API Image (release)
 
 on:
   workflow_dispatch:
@@ -7,27 +7,23 @@ on:
     paths:
       - 'apps/api/**'
       - 'libs/**'
-      - 'web/package.json'
       - 'package.json'
       - 'yarn.lock'
       - '.yarnrc.yml'
-      - '.github/workflows/deploy-api.yml'
+      - '.github/workflows/push-api.yml'
 
 env:
   IMAGE_TAG: prod
 
 jobs:
-  deploy:
+  push:
     runs-on: ubuntu-latest
     permissions: { id-token: write, contents: read }
     env:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-      ECR_REPO: ${{ secrets.ECR_REPO_API }}
-      CLUSTER: ${{ secrets.ECS_CLUSTER }}
-      SERVICE: ${{ secrets.ECS_SERVICE_API }}
-      CONTAINER_NAME: ${{ secrets.CONTAINER_NAME_API }}
+      ECR_REPO: ${{ secrets.ECR_REPO_API }} # 예: catarie/api
       REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
     steps:
@@ -57,7 +53,7 @@ jobs:
       - name: Ensure ECR repo exists
         run: |
           aws ecr describe-repositories --repository-names "${ECR_REPO}" >/dev/null 2>&1 || \
-          aws ecr create-repository --repository-name "${ECR_REPO}"
+          aws ecr create-repository --repository-name "${ECR_REPO}" --image-scanning-configuration scanOnPush=true
 
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -65,13 +61,16 @@ jobs:
       - name: Build API image (root context)
         run: |
           set -e
+          SHORT_SHA=$(git rev-parse --short HEAD)
           DOCKER_BUILDKIT=1 docker build --platform linux/amd64 \
             -f apps/api/Dockerfile \
             -t ${REGISTRY}/${ECR_REPO}:${IMAGE_TAG} \
+            -t ${REGISTRY}/${ECR_REPO}:${IMAGE_TAG}-${SHORT_SHA} \
             .
 
       - name: Push API image
-        run: docker push ${REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
-
-      - name: Force new deployment
-        run: aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --force-new-deployment
+        run: |
+          set -e
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          docker push ${REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
+          docker push ${REGISTRY}/${ECR_REPO}:${IMAGE_TAG}-${SHORT_SHA}

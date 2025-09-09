@@ -1,10 +1,17 @@
+# node/yarn
+node_modules
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# vcs & misc
 .git
-**/node_modules
+.gitignore
+Dockerfile
+**/.DS_Store
+
+# build outputs
 **/dist
-**/.next
-**/.turbo
-**/coverage
-.env*
-docker-compose*
-!apps/**/dist
-!libs/**/dist
