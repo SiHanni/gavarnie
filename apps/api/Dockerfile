@@ -3,15 +3,13 @@
 # ---------- base ----------
     FROM node:20-alpine AS base
     WORKDIR /repo
-    # Yarn v4 (corepack) - 레포의 .yarnrc.yml / .yarn 사용
-    RUN corepack enable
+    # Yarn v4 고정 (레포에 .yarn 없어도 동작)
+    RUN corepack enable && corepack prepare yarn@4.9.3 --activate
     
     # ---------- deps (install with immutable) ----------
     FROM base AS deps
     WORKDIR /repo
-    # Yarn 4는 .yarnrc.yml/.yarn을 같이 써야 재현성 유지
     COPY .yarnrc.yml ./
-    COPY .yarn ./.yarn
     # 루트와 모든 워크스페이스의 package.json + lock만 먼저 복사 (캐시)
     COPY package.json yarn.lock ./
     COPY apps/api/package.json apps/api/
@@ -36,7 +34,6 @@
     FROM base AS proddeps
     WORKDIR /repo
     COPY .yarnrc.yml ./
-    COPY .yarn ./.yarn
     COPY package.json yarn.lock ./
     COPY apps/api/package.json apps/api/
     COPY libs/entities/package.json libs/entities/

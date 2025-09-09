@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.7
 FROM node:20-alpine AS base
 WORKDIR /repo
-RUN corepack enable
+# Yarn v4 고정 (레포에 .yarn 없어도 동작)
+RUN corepack enable && corepack prepare yarn@4.9.3 --activate
 
 FROM base AS deps
 WORKDIR /repo
 COPY .yarnrc.yml ./
-COPY .yarn ./.yarn
 COPY package.json yarn.lock ./
 COPY apps/worker/package.json apps/worker/
 COPY apps/api/package.json apps/api/
@@ -25,7 +25,6 @@ RUN yarn workspaces foreach -A -tv run build || true
 FROM base AS proddeps
 WORKDIR /repo
 COPY .yarnrc.yml ./
-COPY .yarn ./.yarn
 COPY package.json yarn.lock ./
 COPY apps/worker/package.json apps/worker/
 COPY libs/entities/package.json libs/entities/
