@@ -5,6 +5,7 @@ FROM node:20-alpine AS proddeps
 WORKDIR /app
 # Yarn v4 준비 (레포에 .yarn 없어도 OK)
 RUN corepack enable && corepack prepare yarn@4.9.3 --activate
+COPY .yarnrc.yml ./
 # 워크스페이스 메타(패키지 매니페스트)만 복사 후 프로덕션 의존성만 설치
 COPY package.json yarn.lock ./
 COPY apps/api/package.json apps/api/

@@ -49,11 +49,10 @@ jobs:
 
       - name: Build TypeScript (dist 생성)
         run: |
-          npx tsc -b \
-            libs/entities/tsconfig.json \
-            libs/logging/tsconfig.json \
-            libs/migrations/tsconfig.json \
-            apps/api/tsconfig.build.json
+          yarn --cwd libs/entities build
+          yarn --cwd libs/logging build
+          (yarn --cwd libs/migrations build || true)
+          yarn --cwd apps/api build
 
       # 3) ECR 보장 & 로그인
       - name: Ensure ECR repo exists

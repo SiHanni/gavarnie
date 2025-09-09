@@ -4,6 +4,7 @@
 FROM node:20-alpine AS proddeps
 WORKDIR /app
 RUN corepack enable && corepack prepare yarn@4.9.3 --activate
+COPY .yarnrc.yml ./
 COPY package.json yarn.lock ./
 COPY apps/worker/package.json apps/worker/
 COPY libs/entities/package.json libs/entities/
