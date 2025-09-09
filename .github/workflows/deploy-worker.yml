@@ -10,7 +10,7 @@ on:
       - 'package.json'
       - 'yarn.lock'
       - '.yarnrc.yml'
-      - '.github/workflows/push-worker.yml'
+      - '.github/workflows/deploy-worker.yml'
 
 env:
   IMAGE_TAG: prod
