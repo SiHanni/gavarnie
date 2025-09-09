@@ -21,10 +21,11 @@ FROM deps AS build
 WORKDIR /repo
 COPY . .
 
-RUN yarn workspace @catarie/entities build \
- && yarn workspace @catarie/logging build \
- && (yarn workspace @catarie/migrations build || true) \
- && yarn workspace @catarie/worker build
+RUN npx tsc -b \
+  libs/entities/tsconfig.json \
+  libs/logging/tsconfig.json \
+  libs/migrations/tsconfig.json \
+  apps/worker/tsconfig.build.json
     
 
 FROM base AS proddeps

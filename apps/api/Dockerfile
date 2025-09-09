@@ -27,12 +27,13 @@
     WORKDIR /repo
     COPY . .
 
-    # 필요한 워크스페이스를 확실히 빌드 (dist 생성 보장)
-    RUN yarn workspace @catarie/entities build \
-     && yarn workspace @catarie/logging build \
-     && (yarn workspace @catarie/migrations build || true) \
-     && yarn workspace @catarie/api build
-     
+    # libs → api 순서로 컴파일(outDir=dist 가정)
+    RUN npx tsc -b \
+      libs/entities/tsconfig.json \
+      libs/logging/tsconfig.json \
+      libs/migrations/tsconfig.json \
+      apps/api/tsconfig.build.json
+
     # ---------- proddeps (production only) ----------
     FROM base AS proddeps
     WORKDIR /repo
