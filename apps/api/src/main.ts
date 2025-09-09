@@ -12,9 +12,9 @@ import { ExpressAdapter } from '@bull-board/express';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 
-import { httpLoggerMiddleware } from '@libs/logging';
+import { httpLoggerMiddleware } from '@catarie/logging';
 import pino from 'pino';
-import { createLogger } from '@libs/logging';
+import { createLogger } from '@catarie/logging';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { logger: false });

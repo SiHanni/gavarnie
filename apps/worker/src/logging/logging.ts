@@ -1,5 +1,5 @@
 import pino from 'pino';
-import { createLogger, runWithContext } from '@libs/logging';
+import { createLogger, runWithContext } from '@catarie/logging';
 
 export const logger: pino.Logger = createLogger('worker');
 

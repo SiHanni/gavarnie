@@ -1,5 +1,5 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
-import { httpLoggerMiddleware } from '@libs/logging';
+import { httpLoggerMiddleware } from '@catarie/logging';
 
 @Injectable()
 export class HttpLoggerMiddleware implements NestMiddleware {
