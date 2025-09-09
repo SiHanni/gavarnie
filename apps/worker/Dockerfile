@@ -1,31 +1,45 @@
 # syntax=docker/dockerfile:1.7
 FROM node:20-alpine AS base
-WORKDIR /app
-RUN corepack enable && corepack prepare yarn@1.22.19 --activate
+WORKDIR /repo
+RUN corepack enable
 
 FROM base AS deps
-WORKDIR /app
+WORKDIR /repo
+COPY .yarnrc.yml ./
+COPY .yarn ./.yarn
 COPY package.json yarn.lock ./
 COPY apps/worker/package.json apps/worker/
 COPY apps/api/package.json apps/api/
 COPY libs/entities/package.json libs/entities/
 COPY libs/logging/package.json libs/logging/
 COPY libs/migrations/package.json libs/migrations/
-RUN yarn install --frozen-lockfile
+COPY web/package.json web/
+RUN yarn install --immutable --inline-builds && yarn cache clean
 
 FROM deps AS build
+WORKDIR /repo
 COPY . .
-RUN yarn workspaces run build || true
-# RUN yarn --cwd libs/entities build && yarn --cwd libs/logging build && yarn --cwd apps/worker build
+RUN yarn workspaces foreach -A -tv run build || true
+# RUN yarn --cwd libs/entities build && yarn --cwd libs/logging build && yarn --cwd libs/migrations build && yarn --cwd apps/worker build
+
+FROM base AS proddeps
+WORKDIR /repo
+COPY .yarnrc.yml ./
+COPY .yarn ./.yarn
+COPY package.json yarn.lock ./
+COPY apps/worker/package.json apps/worker/
+COPY libs/entities/package.json libs/entities/
+COPY libs/logging/package.json libs/logging/
+COPY libs/migrations/package.json libs/migrations/
+RUN yarn workspaces focus --all --production && yarn cache clean
 
 FROM node:20-alpine AS runtime
-# ffmpeg 필요 (Alpine)
 RUN apk add --no-cache ffmpeg
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=build /app/apps/worker/dist ./apps/worker/dist
-COPY --from=build /app/libs/entities/dist ./libs/entities/dist
-COPY --from=build /app/libs/logging/dist ./libs/logging/dist
+COPY --from=proddeps /repo/node_modules ./node_modules
+COPY --from=build /repo/apps/worker/dist ./apps/worker/dist
+COPY --from=build /repo/libs/entities/dist ./libs/entities/dist
+COPY --from=build /repo/libs/logging/dist ./libs/logging/dist
 EXPOSE 3001
 CMD ["node","apps/worker/dist/main.js"]
