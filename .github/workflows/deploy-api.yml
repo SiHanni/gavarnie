@@ -79,71 +79,94 @@ jobs:
         run: docker push ${REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
 
       # 6) 마이그레이션 실행 (ECS 원오프 태스크, tsx로 TS 소스 실행)
-      - name: Run DB migrations (one-off ECS task)
+      - name: Run DB migrations (one-off ECS task, with fresh TD)
         env:
           CLUSTER: ${{ secrets.ECS_CLUSTER }}
           SERVICE: ${{ secrets.ECS_SERVICE_API }}
-          CONTAINER_NAME: ${{ secrets.CONTAINER_NAME_API }} # ex: api (없어도 자동 감지)
+          CONTAINER_NAME: ${{ secrets.CONTAINER_NAME_API }}
+          IMAGE_URI: ${{ env.REGISTRY }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}
         run: |
           set -e
 
-          # 1) 서비스의 태스크 정의 / 네트워크 모드
+          # 1) 현재 TD/네트워크/컨테이너 이름
           TD=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
                --query 'services[0].taskDefinition' --output text)
           NMODE=$(aws ecs describe-task-definition --task-definition "$TD" \
                --query 'taskDefinition.networkMode' --output text)
+          [ -z "${CONTAINER_NAME:-}" ] || [ "${CONTAINER_NAME}" = "null" ] \
+            && CNAME=$(aws ecs describe-task-definition --task-definition "$TD" \
+                       --query 'taskDefinition.containerDefinitions[0].name' --output text) \
+            || CNAME="$CONTAINER_NAME"
+          echo "baseTD=$TD  container=$CNAME  networkMode=$NMODE"
 
-          # 2) 컨테이너 이름 자동 감지 (CONTAINER_NAME 없으면 TD 첫 컨테이너)
-          if [ -z "${CONTAINER_NAME:-}" ] || [ "${CONTAINER_NAME}" = "null" ]; then
-            CNAME=$(aws ecs describe-task-definition --task-definition "$TD" \
-                    --query 'taskDefinition.containerDefinitions[0].name' --output text)
-          else
-            CNAME="$CONTAINER_NAME"
-          fi
-          echo "container=$CNAME, networkMode=$NMODE"
+          aws ecs describe-task-definition --task-definition "$TD" \
+            --query 'taskDefinition' --output json > td.json
 
-          # 3) overrides (네가 쓰던 명령 그대로)
-          #    - corepack으로 Yarn v4 활성화 (+ CA는 이미지에 설치되어 있어야 함)
-          #    - yarn workspace @catarie/migrations migrate:run
-          OVR=$(jq -n --arg n "$CNAME" --arg cmd 'corepack enable && corepack prepare yarn@4.9.3 --activate && yarn --version && yarn workspace @catarie/migrations migrate:run' \
-                '{containerOverrides:[{name:$n,command:["/bin/sh","-c",$cmd]}]}')
+          # 2) 새 리비전(이미지 강제 치환: 매칭되면 해당 컨테이너, 없으면 0번 컨테이너)
+          jq --arg IMG "$IMAGE_URI" --arg CN "$CNAME" '
+            del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy) as $td
+            | ($td.containerDefinitions | any(.name==$CN)) as $has
+            | $td
+            | .containerDefinitions |= ( if $has
+                then map(if .name==$CN then (.image=$IMG) else . end)
+                else (.[0].image=$IMG | .)
+              )
+            | {
+                family, taskRoleArn, executionRoleArn, networkMode,
+                containerDefinitions, volumes, placementConstraints,
+                requiresCompatibilities, cpu, memory, runtimePlatform,
+                proxyConfiguration, inferenceAccelerators, ephemeralStorage
+              } | del(..|nulls)
+          ' td.json > td-new.json
 
-          # 4) 네트워크 설정 (awsvpc면 서비스와 동일 설정 복제)
+          echo "Container images after replace:"
+          jq -r '.containerDefinitions[] | "\(.name): \(.image)"' td-new.json
+
+          NEW_TD=$(aws ecs register-task-definition --cli-input-json file://td-new.json \
+                   --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "newTD=$NEW_TD"
+
+          # 3) 네트워크 설정
           if [ "$NMODE" = "awsvpc" ]; then
             NET_JSON=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
                          --query 'services[0].networkConfiguration.awsvpcConfiguration' --output json)
             SUBNETS=$(echo "$NET_JSON" | jq -r '.subnets | join(",")')
             SGRPS=$(echo "$NET_JSON" | jq -r '.securityGroups | join(",")')
             PUBIP=$(echo "$NET_JSON" | jq -r '.assignPublicIp // "DISABLED"')
+            NETCFG="awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SGRPS],assignPublicIp=$PUBIP}"
+          else
+            NETCFG=""
+          fi
 
+          # 4) migrate:run (네가 쓰던 명령 그대로)
+          OVR=$(jq -n --arg n "$CNAME" --arg cmd 'corepack enable && corepack prepare yarn@4.9.3 --activate && yarn workspace @catarie/migrations migrate:run' \
+                '{containerOverrides:[{name:$n,command:["/bin/sh","-lc",$cmd]}]}')
+
+          if [ -n "$NETCFG" ]; then
             RUN_OUT=$(aws ecs run-task --cluster "$CLUSTER" --launch-type EC2 \
-              --task-definition "$TD" --count 1 \
-              --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SGRPS],assignPublicIp=$PUBIP}" \
+              --task-definition "$NEW_TD" --count 1 \
+              --network-configuration "$NETCFG" \
               --overrides "$OVR" --started-by "gh-actions-migration" --output json)
           else
             RUN_OUT=$(aws ecs run-task --cluster "$CLUSTER" --launch-type EC2 \
-              --task-definition "$TD" --count 1 \
+              --task-definition "$NEW_TD" --count 1 \
               --overrides "$OVR" --started-by "gh-actions-migration" --output json)
           fi
 
           ARN=$(echo "$RUN_OUT" | jq -r '.tasks[0].taskArn')
           echo "Started task: $ARN"
 
-          # 5) 완료 대기 후 종료코드/이유 출력
           aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$ARN"
-          DESCR=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$ARN" --output json)
 
-          # 매칭되는 컨테이너에서 exitCode 가져오기 (없으면 첫 컨테이너)
+          DESCR=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$ARN" --output json)
+          echo "$DESCR" | jq -r '.tasks[0].containers[] | {name:.name,image:.image,lastStatus:.lastStatus,reason:.reason,exitCode:.exitCode}'
+
           CODE=$(echo "$DESCR" | jq -r --arg n "$CNAME" \
             '[.tasks[0].containers[] | select(.name==$n) | .exitCode][0]')
-          if [ "$CODE" = "null" ] || [ -z "$CODE" ]; then
-            echo "Exit code missing. Container statuses:"
-            echo "$DESCR" | jq -r '.tasks[0].containers[] | {name:.name,lastStatus:.lastStatus,reason:.reason,exitCode:.exitCode}'
-            exit 1
-          fi
+          [ "$CODE" = "0" ] || (echo "Migration failed (${CODE:-N/A})"; exit 1)
 
-          echo "Migration exit code: $CODE"
-          [ "$CODE" = "0" ] || (echo "Migration failed ($CODE)"; exit 1)
+          # 5) 서비스도 방금 리비전으로
+          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$NEW_TD"
 
       # 7) 서비스 재배포
       - name: Force new deployment
