@@ -12,8 +12,6 @@
   RUN corepack enable && corepack prepare yarn@4.9.3 --activate
   
   # 🔧 전역 빌드 도구 보장 (tsc/tsx/nest)
-  #   - workspaces focus 사용 시 각 워크스페이스 devDeps가 안 깔릴 수 있으므로
-  #   - 전역으로 도구를 보장해 tsc/nest/tsx 명령어 실패(127)를 방지
   RUN npm i -g typescript@5 tsx@4 @nestjs/cli@^10
   
   # 루트 메타/TS 설정
@@ -26,7 +24,7 @@
   COPY libs/logging/package.json libs/logging/package.json
   COPY libs/migrations/package.json libs/migrations/package.json
   
-  # ❗ devDeps 포함하여 모든 필요한 워크스페이스를 포커스 설치
+  # 필요한 워크스페이스 전부 설치 (devDeps 포함)
   RUN yarn workspaces focus \
     @catarie/api \
     @catarie/worker \
@@ -42,23 +40,33 @@
   COPY libs/logging ./libs/logging
   COPY libs/migrations ./libs/migrations
   
-  # 라이브러리 → 앱 순서로 빌드 (tsc/nest는 전역으로 보장됨)
+  # 라이브러리 → 앱 순서로 빌드
   RUN yarn workspace @catarie/entities build \
    && yarn workspace @catarie/logging build \
    && yarn workspace @catarie/api build \
    && yarn workspace @catarie/worker build
   
   # ---------- Runtime ----------
-  FROM node:20-bookworm AS runner
+  # 👉 slim 베이스로 변경하여 용량 절감
+  FROM node:20-bookworm-slim AS runner
   WORKDIR /app
   ENV NODE_ENV=production
   
-  # 런타임에서도 yarn 사용 보장(마이그 전용 커맨드에 필요)
-  RUN corepack enable && corepack prepare yarn@4.9.3 --activate
+  # mysql 클라이언트(=mysql 명령) + CA 인증서만 최소 설치
+  RUN apt-get update \
+   && apt-get install -y --no-install-recommends default-mysql-client ca-certificates \
+   && rm -rf /var/lib/apt/lists/*
   
-  # 빌더 산출물(node_modules 포함) 복사
+  # 런타임에서 yarn/tsx 사용 보장(마이그 전용 커맨드에 필요)
+  RUN corepack enable && corepack prepare yarn@4.9.3 --activate \
+   && npm i -g tsx@4
+  
+  # 빌더 산출물 복사 (dist + node_modules 포함)
   COPY --from=builder /app /app
   
+  # 🔻 용량 절감 (선택) — 소스맵/테스트 등 제거
+  #   * 디버깅에 소스맵 필요하면 아래 줄을 주석 처리하세요.
+  RUN find /app -type f -name '*.map' -delete || true
   
   # 진입 스크립트 생성 (heredoc 대신 printf 사용)
   RUN printf '%s\n' \
