@@ -11,6 +11,11 @@
   # Yarn v4
   RUN corepack enable && corepack prepare yarn@4.9.3 --activate
   
+  # 🔧 전역 빌드 도구 보장 (tsc/tsx/nest)
+  #   - workspaces focus 사용 시 각 워크스페이스 devDeps가 안 깔릴 수 있으므로
+  #   - 전역으로 도구를 보장해 tsc/nest/tsx 명령어 실패(127)를 방지
+  RUN npm i -g typescript@5 tsx@4 @nestjs/cli@^10
+  
   # 루트 메타/TS 설정
   COPY package.json yarn.lock .yarnrc.yml tsconfig.json tsconfig.base.json ./
   
@@ -37,7 +42,7 @@
   COPY libs/logging ./libs/logging
   COPY libs/migrations ./libs/migrations
   
-  # 라이브러리 → 앱 순서로 빌드
+  # 라이브러리 → 앱 순서로 빌드 (tsc/nest는 전역으로 보장됨)
   RUN yarn workspace @catarie/entities build \
    && yarn workspace @catarie/logging build \
    && yarn workspace @catarie/api build \
