@@ -21,8 +21,14 @@
   COPY libs/logging/package.json libs/logging/package.json
   COPY libs/migrations/package.json libs/migrations/package.json
   
-  # web 누락으로 인한 install 실패 방지: focus로 필요한 트리만 설치 (dev 포함)
-  RUN yarn workspaces focus @catarie/api @catarie/worker --all
+  # ❗ devDeps 포함하여 모든 필요한 워크스페이스를 포커스 설치
+  RUN yarn workspaces focus \
+    @catarie/api \
+    @catarie/worker \
+    @catarie/entities \
+    @catarie/logging \
+    @catarie/migrations \
+    --all
   
   # 실제 소스 반입 (web 제외)
   COPY apps/api ./apps/api
