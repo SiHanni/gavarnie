@@ -1,19 +1,23 @@
-# node/yarn
+# node
 node_modules
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
+**/node_modules
 
-# vcs & misc
+# git / editor
 .git
 .gitignore
-Dockerfile
-**/.DS_Store
+.vscode
+.idea
 
 # build outputs
 **/dist
-!apps/**/dist
-!libs/**/dist
+**/.turbo
+**/.next
+**/coverage
+
+# local files
+.env
+.env.*
+*.log
+
+# 웹 빼기(혹시 COPY . 할 일이 생겨도 안전)
+web/
