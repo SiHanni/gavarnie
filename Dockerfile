@@ -41,6 +41,7 @@
     WORKDIR /app
     ENV NODE_ENV=production
     
+    
     # 런타임에서도 yarn 사용 보장(마이그 전용 커맨드에 필요)
     RUN corepack enable && corepack prepare yarn@4.9.3 --activate
     
