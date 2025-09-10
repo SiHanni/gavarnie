@@ -23,7 +23,14 @@ COPY apps/api/dist ./apps/api/dist
 COPY libs/entities/dist ./libs/entities/dist
 COPY libs/logging/dist ./libs/logging/dist
 
-# ✅ migrations는 src도 복사 (향후 필요 시)
+# ✅ 런타임에서 패키지 해석될 수 있도록 node_modules 아래에 워크스페이스 패키지 형태로도 복사
+RUN mkdir -p node_modules/@catarie/entities node_modules/@catarie/logging
+COPY libs/entities/package.json node_modules/@catarie/entities/package.json
+COPY libs/entities/dist         node_modules/@catarie/entities/dist
+COPY libs/logging/package.json  node_modules/@catarie/logging/package.json
+COPY libs/logging/dist          node_modules/@catarie/logging/dist
+
+# (필요 시) migrations 소스 유지
 COPY libs/migrations/package.json ./libs/migrations/package.json
 COPY libs/migrations/src ./libs/migrations/src
 
