@@ -59,6 +59,7 @@
   # 빌더 산출물(node_modules 포함) 복사
   COPY --from=builder /app /app
   
+  
   # 진입 스크립트 생성 (heredoc 대신 printf 사용)
   RUN printf '%s\n' \
     '#!/usr/bin/env bash' \
