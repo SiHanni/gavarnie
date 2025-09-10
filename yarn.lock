@@ -1184,9 +1184,9 @@ __metadata:
     "@bull-board/api": "npm:^6.12.6"
     "@bull-board/express": "npm:^6.12.6"
     "@catarie/entities": "workspace:*"
+    "@catarie/logging": "workspace:*"
     "@eslint/eslintrc": "npm:^3.2.0"
     "@eslint/js": "npm:^9.18.0"
-    "@libs/logging": "workspace:*"
     "@nestjs/cli": "npm:^11.0.0"
     "@nestjs/common": "npm:^11.0.1"
     "@nestjs/config": "npm:^4.0.2"
@@ -1228,6 +1228,7 @@ __metadata:
     prettier: "npm:^3.4.2"
     reflect-metadata: "npm:^0.2.2"
     rxjs: "npm:^7.8.1"
+    sharp: "npm:^0.34.3"
     source-map-support: "npm:^0.5.21"
     supertest: "npm:^7.0.0"
     swagger-ui-express: "npm:^5.0.1"
@@ -1256,6 +1257,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@catarie/logging@workspace:*, @catarie/logging@workspace:libs/logging":
+  version: 0.0.0-use.local
+  resolution: "@catarie/logging@workspace:libs/logging"
+  dependencies:
+    pino: "npm:^9.0.0"
+    pino-http: "npm:^10.3.0"
+  languageName: unknown
+  linkType: soft
+
 "@catarie/migrations@workspace:libs/migrations":
   version: 0.0.0-use.local
   resolution: "@catarie/migrations@workspace:libs/migrations"
@@ -1274,9 +1284,9 @@ __metadata:
     "@aws-sdk/client-s3": "npm:^3.873.0"
     "@aws-sdk/lib-storage": "npm:^3.873.0"
     "@catarie/entities": "workspace:*"
+    "@catarie/logging": "workspace:*"
     "@eslint/eslintrc": "npm:^3.2.0"
     "@eslint/js": "npm:^9.18.0"
-    "@libs/logging": "workspace:*"
     "@nestjs/cli": "npm:^11.0.0"
     "@nestjs/common": "npm:^11.0.1"
     "@nestjs/config": "npm:^4.0.2"
@@ -2543,15 +2553,6 @@ __metadata:
   checksum: 10c0/3a1516c10f44613b9ba27c37a02ff8f410893776b2b3dad20a391b51b884dd60f97bbb56936d65d2ff8fe978510a0000266654ab8426bdb9ceb5fb4585b19e23
   languageName: node
   linkType: hard
-
-"@libs/logging@workspace:*, @libs/logging@workspace:libs/logging":
-  version: 0.0.0-use.local
-  resolution: "@libs/logging@workspace:libs/logging"
-  dependencies:
-    pino: "npm:^9.0.0"
-    pino-http: "npm:^10.3.0"
-  languageName: unknown
-  linkType: soft
 
 "@lukeed/csprng@npm:^1.0.0":
   version: 1.1.0

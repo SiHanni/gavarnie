@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { LoggerService } from '@nestjs/common';
 import pino from 'pino';
-import { createLogger } from '@libs/logging';
+import { createLogger } from '@catarie/logging';
 
 // Pino → Nest Logger 어댑터
 const pinoLogger: pino.Logger = createLogger('worker');

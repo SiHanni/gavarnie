@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import pino from 'pino';
-import { createLogger } from '@libs/logging';
+import { createLogger } from '@catarie/logging';
 
 @Global()
 @Module({

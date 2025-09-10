@@ -1,61 +1,45 @@
 # syntax=docker/dockerfile:1.7
 
-# ---------- base ----------
-    FROM node:20-alpine AS base
-    WORKDIR /repo
-    # Yarn v4 (corepack) - 레포의 .yarnrc.yml / .yarn 사용
-    RUN corepack enable
-    
-    # ---------- deps (install with immutable) ----------
-    FROM base AS deps
-    WORKDIR /repo
-    # Yarn 4는 .yarnrc.yml/.yarn을 같이 써야 재현성 유지
-    COPY .yarnrc.yml ./
-    COPY .yarn ./.yarn
-    # 루트와 모든 워크스페이스의 package.json + lock만 먼저 복사 (캐시)
-    COPY package.json yarn.lock ./
-    COPY apps/api/package.json apps/api/
-    COPY apps/worker/package.json apps/worker/
-    COPY libs/entities/package.json libs/entities/
-    COPY libs/logging/package.json libs/logging/
-    COPY libs/migrations/package.json libs/migrations/
-    # ← web도 워크스페이스이므로 포함
-    COPY web/package.json web/            
-    # Yarn v4: --frozen-lockfile 대신 --immutable (필요시 빌드내 native 모듈용 --inline-builds)
-    RUN yarn install --immutable --inline-builds && yarn cache clean
-    
-    # ---------- build ----------
-    FROM deps AS build
-    WORKDIR /repo
-    COPY . .
-    # 워크스페이스 전역 빌드 (각 패키지에 build 스크립트 있다고 가정)
-    RUN yarn workspaces foreach -A -tv run build || true
-    # (필요 시) 개별: RUN yarn --cwd libs/entities build && yarn --cwd libs/logging build && yarn --cwd libs/migrations build && yarn --cwd apps/api build
-    
-    # ---------- proddeps (production only) ----------
-    FROM base AS proddeps
-    WORKDIR /repo
-    COPY .yarnrc.yml ./
-    COPY .yarn ./.yarn
-    COPY package.json yarn.lock ./
-    COPY apps/api/package.json apps/api/
-    COPY libs/entities/package.json libs/entities/
-    COPY libs/logging/package.json libs/logging/
-    COPY libs/migrations/package.json libs/migrations/
-    # 프로덕션 의존성만 포커스 (node-modules 링크 방식 가정)
-    RUN yarn workspaces focus --all --production && yarn cache clean
-    
-    # ---------- runtime ----------
-    FROM node:20-alpine AS runtime
-    WORKDIR /app
-    ENV NODE_ENV=production
-    # 프로덕션 node_modules만
-    COPY --from=proddeps /repo/node_modules ./node_modules
-    # 실행 산출물
-    COPY --from=build /repo/apps/api/dist ./apps/api/dist
-    COPY --from=build /repo/libs/entities/dist ./libs/entities/dist
-    COPY --from=build /repo/libs/logging/dist ./libs/logging/dist
-    COPY --from=build /repo/libs/migrations/dist ./libs/migrations/dist
-    EXPOSE 3000
-    CMD ["node","apps/api/dist/main.js"]
-    
+# ── Prod deps only (Yarn v4) ───────────────────────────────────────────
+FROM node:20-bookworm-slim AS proddeps
+WORKDIR /app
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# Yarn v4
+RUN corepack enable && corepack prepare yarn@4.9.3 --activate
+COPY .yarnrc.yml ./
+COPY package.json yarn.lock ./
+COPY apps/api/package.json apps/api/
+COPY libs/entities/package.json libs/entities/
+COPY libs/logging/package.json libs/logging/
+COPY libs/migrations/package.json libs/migrations/
+# 선택 워크스페이스만 설치 (api에 sharp, bcrypt 등 포함)
+RUN yarn workspaces focus --production @catarie/api @catarie/entities @catarie/logging @catarie/migrations \
+  && yarn cache clean
+
+# ── Runtime ────────────────────────────────────────────────────────────
+FROM node:20-bookworm-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# node_modules
+COPY --from=proddeps /app/node_modules ./node_modules
+
+# 빌드 산출물
+COPY apps/api/dist ./apps/api/dist
+COPY libs/entities/dist ./libs/entities/dist
+COPY libs/logging/dist ./libs/logging/dist
+
+# 워크스페이스 패키지를 node_modules에도 만들어 패키지 해석 보장
+RUN mkdir -p node_modules/@catarie/entities node_modules/@catarie/logging
+COPY libs/entities/package.json node_modules/@catarie/entities/package.json
+COPY libs/entities/dist         node_modules/@catarie/entities/dist
+COPY libs/logging/package.json  node_modules/@catarie/logging/package.json
+COPY libs/logging/dist          node_modules/@catarie/logging/dist
+
+# (선택) 마이그 소스 유지
+COPY libs/migrations/package.json ./libs/migrations/package.json
+COPY libs/migrations/src ./libs/migrations/src
+
+EXPOSE 3000
+CMD ["node","apps/api/dist/main.js"]
