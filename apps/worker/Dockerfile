@@ -12,7 +12,7 @@ COPY libs/migrations/package.json libs/migrations/
 RUN yarn workspaces focus --all --production && yarn cache clean
 
 FROM node:20-alpine AS runtime
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache ffmpeg libc6-compat
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=proddeps /app/node_modules ./node_modules
