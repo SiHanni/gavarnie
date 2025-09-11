@@ -9,9 +9,9 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "mysql2": "^3.11.3",
-    "tsx": "^4.19.2",
-    "typeorm": "^0.3.20"
+    "mysql2": "^3.14.3",
+    "tsx": "^4.20.5",
+    "typeorm": "^0.3.26"
   },
   "devDependencies": {
     "@types/node": "^24.3.1",

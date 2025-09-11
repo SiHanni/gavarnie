@@ -3,7 +3,15 @@
   "references": [
     { "path": "libs/entities" },
     { "path": "libs/logging" },
+    { "path": "libs/migrations" },
     { "path": "apps/api" },
     { "path": "apps/worker" }
+  ],
+  "exclude": [
+    "node_modules",
+    "**/node_modules",
+    "**/dist",
+    "**/.turbo",
+    "**/.next"
   ]
 }

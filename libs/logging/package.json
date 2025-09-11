@@ -1,15 +1,21 @@
 {
   "name": "@catarie/logging",
   "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "private": true,
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "build:watch": "tsc -p tsconfig.json -w"
   },
   "dependencies": {
-    "pino": "^9.0.0",
-    "pino-http": "^10.3.0"
+    "pino": "^9.9.4",
+    "pino-http": "^10.5.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.1",

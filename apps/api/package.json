@@ -4,9 +4,11 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "start": "node dist/main.js",
     "start:dev": "nest start --watch -r tsconfig-paths/register",
     "build": "nest build",
-    "upload:test": "tsx scripts/upload-test.ts"
+    "upload:test": "tsx scripts/upload-test.ts",
+    "start:prod": "NODE_ENV=production NODE_OPTIONS='--enable-source-maps' node dist/main.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
@@ -73,22 +75,5 @@
     "tsx": "^4.20.5",
     "typescript": "5.9.2",
     "typescript-eslint": "^8.20.0"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
   }
 }

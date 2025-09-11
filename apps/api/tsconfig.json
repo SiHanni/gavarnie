@@ -2,8 +2,15 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "./dist"
+    "outDir": "./dist",
+
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../../libs/entities" }]
+  "references": [
+    { "path": "../../libs/entities" },
+    { "path": "../../libs/logging" }
+  ]
 }

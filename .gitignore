@@ -1,6 +1,9 @@
 # Node
 node_modules/
+**/node_modules/
 dist/
+**/dist/
+**/*.tsbuildinfo
 build/
 temp/
 tmp/
@@ -14,6 +17,7 @@ tmp/
 
 # Logs
 logs/
+infra/logs/*.ndjson
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -40,3 +44,5 @@ coverage/
 
 # next
 web/.next/
+
+**/*.tsbuildinfo

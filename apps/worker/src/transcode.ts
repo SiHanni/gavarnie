@@ -1,6 +1,8 @@
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 
+const ffprobe = require('ffprobe-static');
+
 import { mkdtempSync, rmSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { extname, join } from 'path';
@@ -8,6 +10,7 @@ import { downloadToFile, uploadDir } from './s3';
 import { logger } from './logging/logging';
 
 ffmpeg.setFfmpegPath(ffmpegPath || '');
+ffmpeg.setFfprobePath(ffprobe.path);
 
 type MediaKind = 'audio' | 'video' | 'unknown';
 

@@ -1,34 +1,41 @@
 {
   "name": "catarie",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "workspaces": [
     "apps/*",
-    "web",
-    "infra",
     "libs/*",
-    "web"
+    "web",
+    "infra"
   ],
   "scripts": {
     "build": "tsc -b -v",
     "build:clean": "rimraf apps/**/dist libs/**/dist",
+    "// dev convenience": "====================",
     "dev:api": "NODE_ENV=development yarn workspace @catarie/api start:dev",
     "dev:worker": "NODE_ENV=development yarn workspace @catarie/worker start:dev",
     "dev:entities:watch": "yarn workspace @catarie/entities build:watch",
-    "dev:all": "yarn workspace @catarie/entities build && concurrently -n ENTITIES,API,WORKER -c auto \"yarn workspace @catarie/entities build:watch\" \"yarn workspace @catarie/api start:dev\" \"yarn workspace @catarie/worker start:dev\""
+    "dev:all": "yarn workspace @catarie/entities build && concurrently -n ENTITIES,API,WORKER -c auto \"yarn workspace @catarie/entities build:watch\" \"yarn workspace @catarie/api start:dev\" \"yarn workspace @catarie/worker start:dev\"",
+    "// prod convenience": "====================",
+    "build:api": "yarn workspace @catarie/api build",
+    "build:worker": "yarn workspace @catarie/worker build",
+    "prod:api": "NODE_ENV=production yarn workspace @catarie/api start",
+    "prod:worker": "NODE_ENV=production yarn workspace @catarie/worker start",
+    "db:migrate": "yarn workspace @catarie/migrations migrate:run",
+    "db:migrate:revert": "yarn workspace @catarie/migrations migrate:revert",
+    "db:migrate:show": "yarn workspace @catarie/migrations migrate:show"
   },
   "packageManager": "yarn@4.9.3",
   "devDependencies": {
     "@types/mime-types": "^3.0.1",
-    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
     "dotenv-cli": "^10.0.0",
     "pino-pretty": "^13.1.1",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.12",
-    "tsx": "^4.20.5"
+    "rimraf": "^6.0.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.5.4"
   },
-  "dependencies": {
-    "framer-motion": "^12.23.12",
-    "sharp": "^0.34.3"
+  "engines": {
+    "node": ">=20 <21"
   }
 }

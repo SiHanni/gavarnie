@@ -1,11 +1,11 @@
-import { getDataSource } from '../data-source.js';
+import { getDataSource } from '../data-source.js'; // ← .js 제거(또는 .ts 명시 OK)
 
 (async () => {
   const ds = await getDataSource();
   await ds.initialize();
   try {
     console.log(
-      '[DEBUG] loaded migrations:',
+      '[MIGRATE RUN] loaded migrations:',
       ds.migrations.map(m => m.name)
     );
     const res = await ds.runMigrations();
