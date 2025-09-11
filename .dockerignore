@@ -1,0 +1,15 @@
+# .dockerignore
+.git
+.gitignore
+node_modules
+dist
+.next
+coverage
+*.log
+.DS_Store
+.env*
+.tmp
+.cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
