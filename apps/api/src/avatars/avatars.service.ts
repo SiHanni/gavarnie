@@ -10,6 +10,7 @@ import {
   DeleteObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
+  S3ClientConfig,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { User } from '@catarie/entities';
@@ -62,17 +63,48 @@ export class AvatarsService {
   }
 
   private s3(): S3Client {
-    // TODO: 기존 S3_CLIENT provider를 재사용해도 가능
-    return new S3Client({
-      region: process.env.STORAGE_REGION,
-      endpoint: process.env.STORAGE_ENDPOINT,
-      credentials: {
-        accessKeyId: process.env.STORAGE_ACCESS_KEY || '',
-        secretAccessKey: process.env.STORAGE_SECRET_KEY || '',
-      },
+    // 드라이버 결정: 명시적 STORAGE_DRIVER 우선, 없으면 NODE_ENV 기준
+    // dev → minio, production → s3 로 동작하도록 기본값 설정
+    const driver =
+      process.env.STORAGE_DRIVER ??
+      (process.env.NODE_ENV === 'production' ? 's3' : 'minio');
+
+    const isS3 = driver === 's3';
+
+    const region = process.env.STORAGE_REGION || 'ap-northeast-2';
+    const endpoint =
+      // S3일 때는 endpoint 지정 안 하는 게 기본(빈 값이면 자동 무시)
+      isS3
+        ? undefined
+        : process.env.STORAGE_ENDPOINT || 'http://localhost:19000';
+
+    // 운영(S3)에서는 EC2 IAM Role을 쓰는 경우가 많으므로,
+    // AccessKey/Secret이 없으면 credentials를 아예 넘기지 않음(Provider Chain 사용)
+    const hasStaticCreds =
+      !!process.env.STORAGE_ACCESS_KEY && !!process.env.STORAGE_SECRET_KEY;
+
+    const base: S3ClientConfig = {
+      region,
+      ...(endpoint ? { endpoint } : {}),
+      // MinIO는 path-style 권장(true). 운영 S3는 false(기본) 권장.
       forcePathStyle:
-        String(process.env.STORAGE_FORCE_PATH_STYLE || 'true') === 'true',
-    });
+        typeof process.env.STORAGE_FORCE_PATH_STYLE === 'string'
+          ? String(process.env.STORAGE_FORCE_PATH_STYLE) === 'true'
+          : !isS3, // 기본: MinIO=true, S3=false
+    };
+
+    // 정적 키가 있으면 명시적 credentials, 없으면 기본 Provider Chain(IAM Role 포함)
+    const cfg: S3ClientConfig = hasStaticCreds
+      ? {
+          ...base,
+          credentials: {
+            accessKeyId: process.env.STORAGE_ACCESS_KEY!,
+            secretAccessKey: process.env.STORAGE_SECRET_KEY!,
+          },
+        }
+      : base;
+
+    return new S3Client(cfg);
   }
 
   /** presign: 원본 업로드용 URL 발급 (여기서 쿨다운 + 용량 가드) */

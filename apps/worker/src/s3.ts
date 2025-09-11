@@ -1,3 +1,4 @@
+// worker/src/s3.ts (예시 경로: 도련님 프로젝트 구조에 맞춰 두시던 위치 그대로 교체)
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { createReadStream, createWriteStream, readdirSync, statSync } from 'fs';
@@ -10,34 +11,85 @@ const pipe = promisify(pipeline);
 
 // ---- helpers ----
 const bool = (v: any) => String(v).toLowerCase() === 'true';
+
+function getDriver(): 's3' | 'minio' {
+  const d =
+    process.env.STORAGE_DRIVER ??
+    (process.env.NODE_ENV === 'production' ? 's3' : 'minio');
+  return d === 's3' ? 's3' : 'minio';
+}
+
+// MinIO 경로에서만 필수로 요구되는 ENV는 required 사용
 const required = (name: string) => {
   const v = process.env[name];
   if (!v) throw new Error(`[s3] missing env: ${name}`);
   return v;
 };
-const getBucket = () => process.env.STORAGE_BUCKET || 'media';
+
+// 버킷 우선순위: MEDIA 전용 → 공통 → 기본 'media'
+const getBucket = () =>
+  process.env.STORAGE_BUCKET_MEDIA || process.env.STORAGE_BUCKET || 'media';
 
 // ---- lazy S3 client ----
 let _s3Real: S3Client | null = null;
+
 function createS3(): S3Client {
-  const endpoint = required('STORAGE_ENDPOINT'); // ex) http://localhost:19000
-  const region = process.env.STORAGE_REGION || 'us-east-1';
-  const accessKeyId = required('STORAGE_ACCESS_KEY');
-  const secretAccessKey = required('STORAGE_SECRET_KEY');
-  const forcePathStyle = bool(process.env.STORAGE_FORCE_PATH_STYLE ?? 'true');
+  const driver = getDriver();
+  const isS3 = driver === 's3';
+
+  // 기본 리전(운영/개발 공통). 필요 시 ENV로 덮어씀.
+  const region = process.env.STORAGE_REGION || 'ap-northeast-2';
+
+  // endpoint: S3는 기본적으로 지정하지 않음(공식 엔드포인트 사용),
+  // MinIO는 필수(예: http://localhost:19000)
+  const endpoint = isS3
+    ? process.env.STORAGE_ENDPOINT || undefined // 비워두면 자동
+    : required('STORAGE_ENDPOINT');
+
+  // forcePathStyle: MinIO는 true 기본, S3는 false 기본
+  const forcePathStyle =
+    typeof process.env.STORAGE_FORCE_PATH_STYLE === 'string'
+      ? bool(process.env.STORAGE_FORCE_PATH_STYLE)
+      : !isS3;
+
+  // 자격증명:
+  // - 운영(S3)에서 IAM Role 사용 시 STORAGE_ACCESS_KEY/SECRET 없어도 됨(생략)
+  // - MinIO에서는 키 필수
+  const accessKeyId = isS3
+    ? process.env.STORAGE_ACCESS_KEY
+    : required('STORAGE_ACCESS_KEY');
+  const secretAccessKey = isS3
+    ? process.env.STORAGE_SECRET_KEY
+    : required('STORAGE_SECRET_KEY');
+  const hasStaticCreds = !!accessKeyId && !!secretAccessKey;
 
   logger.info(
-    { mod: 's3', endpoint, region, forcePathStyle },
+    {
+      mod: 's3',
+      driver,
+      endpoint: endpoint ?? '(aws default)',
+      region,
+      forcePathStyle,
+      hasStaticCreds,
+    },
     '[s3] init client',
   );
 
-  return new S3Client({
+  // 공통 베이스
+  const base: any = {
     region,
-    endpoint,
-    credentials: { accessKeyId, secretAccessKey },
-    forcePathStyle, // ✅ MinIO 필수
-  });
+    ...(endpoint ? { endpoint } : {}),
+    forcePathStyle,
+  };
+
+  // 정적 키가 있으면 명시, 없으면 IAM Role 등 기본 Provider Chain 사용
+  const cfg = hasStaticCreds
+    ? { ...base, credentials: { accessKeyId, secretAccessKey } }
+    : base;
+
+  return new S3Client(cfg);
 }
+
 function getS3Real(): S3Client {
   if (_s3Real) return _s3Real;
   _s3Real = createS3();
