@@ -1,5 +1,3 @@
-# apps/worker/Dockerfile
-
 # ---------- Builder ----------
     FROM node:20-bookworm-slim AS builder
     WORKDIR /app
@@ -15,13 +13,10 @@
     RUN yarn build:worker
     RUN yarn workspaces focus --all --production
     
-    # libs 빌드 산출물을 워크스페이스 디렉토리에 배치
     RUN bash -lc 'if [ -d dist/libs ]; then \
-      for d in dist/libs/*; do \
-        n=$(basename "$d"); \
+      for d in dist/libs/*; do n=$(basename "$d"); \
         mkdir -p libs/$n/dist && cp -r dist/libs/$n/* libs/$n/dist/; \
-      done; \
-    fi'
+      done; fi'
     
     # ---------- Runtime ----------
     FROM node:20-bookworm-slim AS runtime
@@ -34,7 +29,8 @@
     COPY --from=builder /app/libs ./libs
     COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
     
-    RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+    # ffmpeg가 필요하면 아래 주석 해제
+    # RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
     
     USER node
     CMD ["node", "apps/worker/dist/main.js"]
