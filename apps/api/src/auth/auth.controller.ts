@@ -2,8 +2,8 @@ import {
   Body,
   Controller,
   Get,
-  Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -14,7 +14,13 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { LoginDto, SignupDto, MyProfileDto } from './dto';
+import {
+  LoginDto,
+  SignupDto,
+  MyProfileDto,
+  VerifyCodeDto,
+  EmailAvailableQueryDto,
+} from './dto';
 import { JwtAuthGuard } from './jwt/jwt-auth.guard';
 import { UsersService } from '../users/users.service';
 
@@ -26,8 +32,17 @@ export class AuthController {
     private readonly usersService: UsersService,
   ) {}
 
+  @Post('verify-code')
+  @ApiOperation({ summary: '이메일 인증코드 검증(성공 시 검증 상태 확정)' })
+  @ApiOkResponse({ schema: { example: { ok: true } } })
+  verifyCode(@Body() dto: VerifyCodeDto) {
+    return this.auth.verifyCode(dto.email, dto.code, dto.purpose || 'signup');
+  }
+
   @Post('signUp')
-  @ApiOperation({ summary: '회원가입' })
+  @ApiOperation({
+    summary: '회원가입(최근에 verify-code 성공한 이메일만 허용)',
+  })
   @ApiOkResponse({
     schema: {
       example: {
@@ -36,7 +51,12 @@ export class AuthController {
     },
   })
   signUp(@Body() dto: SignupDto) {
-    return this.auth.signUp(dto.email, dto.password, dto.displayName);
+    return this.auth.signUp(
+      dto.email,
+      dto.password,
+      dto.passwordConfirm,
+      dto.displayName,
+    );
   }
 
   @Post('login')
@@ -67,5 +87,12 @@ export class AuthController {
       statusMessage: user.statusMessage ?? null,
       handle: user.handle,
     };
+  }
+
+  @Get('email-available')
+  @ApiOperation({ summary: '이메일 가용성 체크(이미 가입된 메일인지 확인)' })
+  @ApiOkResponse({ schema: { example: { available: true } } })
+  emailAvailable(@Query() q: EmailAvailableQueryDto) {
+    return this.auth.emailAvailable(q.email);
   }
 }

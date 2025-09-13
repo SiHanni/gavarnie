@@ -11,7 +11,9 @@
     "start:prod": "NODE_ENV=production NODE_OPTIONS='--enable-source-maps' node dist/main.js"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.888.0",
     "@aws-sdk/client-s3": "^3.873.0",
+    "@aws-sdk/lib-dynamodb": "^3.888.0",
     "@aws-sdk/s3-request-presigner": "^3.873.0",
     "@bull-board/api": "^6.12.6",
     "@bull-board/express": "^6.12.6",

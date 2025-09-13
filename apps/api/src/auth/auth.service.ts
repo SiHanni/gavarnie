@@ -1,16 +1,45 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
+import { OtpService } from './otp.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private users: UsersService,
     private jwt: JwtService,
+    private otp: OtpService,
   ) {}
 
-  async signUp(email: string, password: string, displayName: string) {
+  async verifyCode(email: string, code: string, purpose = 'signup') {
+    await this.otp.verifyEmailCode(email, code, purpose);
+    return { ok: true };
+  }
+
+  async signUp(
+    email: string,
+    password: string,
+    passwordConfirm: string,
+    displayName: string,
+  ) {
+    if (password !== passwordConfirm) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    // 1) 최근 검증 여부 필수
+    await this.otp.requireVerified(email);
+
+    // 2) 실제 유저 생성
     const user = await this.users.create(email, password, displayName);
+
+    // 3) 검증표식 소비(삭제) — 재사용 방지
+    await this.otp.consumeVerification(email);
+
+    // 4) 토큰 발급
     return this.issue(user.id, user.email);
   }
 
@@ -27,5 +56,10 @@ export class AuthService {
       expiresIn: process.env.JWT_EXPIRES || '1h',
     });
     return { accessToken };
+  }
+
+  async emailAvailable(email: string) {
+    const u = await this.users.findByEmail?.(email);
+    return { available: !u };
   }
 }
