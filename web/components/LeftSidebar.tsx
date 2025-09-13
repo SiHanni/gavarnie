@@ -316,7 +316,7 @@ export default function LeftSidebar({
                          hover:bg-white/10 hover:border-white/20 transition-colors
                          focus:outline-none focus:ring-2 focus:ring-[#5a319f]/60'
             >
-              <div className='w-11 h-11 overflow-hidden rounded-full border border-white/20'>
+              <div className='w-11 h-11 shrink-0 flex-none aspect-square overflow-hidden rounded-full border border-white/20'>
                 {me!.avatarUrl ? (
                   <img
                     src={me!.avatarUrl}
