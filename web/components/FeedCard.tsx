@@ -27,44 +27,6 @@ export default function FeedCard({ node }: { node: RecentMediaNode }) {
       <div className='bg-black'>
         <VideoPlayer src={streamUrl} muted />
       </div>
-
-      {/* 하단: 액션/카운트 (초기 뼈대: 클릭만) */}
-      <footer className='p-4 flex items-center justify-between'>
-        <div className='flex items-center gap-4'>
-          <button
-            type='button'
-            className='text-sm'
-            onClick={() => {
-              /* TODO: /media/:id like */
-            }}
-          >
-            좋아요 {node.likeCount}
-          </button>
-
-          <button
-            type='button'
-            className='text-sm'
-            onClick={() => {
-              /* TODO: 댓글 패널 오픈 */
-            }}
-          >
-            댓글 {node.commentCount}
-          </button>
-
-          <button
-            type='button'
-            className='text-sm'
-            onClick={() => {
-              /* TODO: 공유(프론트) */
-            }}
-          >
-            공유
-          </button>
-        </div>
-        <time className='text-xs text-neutral-500'>
-          {new Date(node.createdAt).toLocaleString()}
-        </time>
-      </footer>
     </article>
   );
 }

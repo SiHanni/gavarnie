@@ -32,7 +32,7 @@ export default function EditProfileModal() {
   // 프리뷰 캐시버스터
   const [previewNonce, setPreviewNonce] = useState<number>(0);
 
-  // ✅ 모달 포커스는 "카드 래퍼"에만 한 번 부여
+  // 모달 포커스는 "카드 래퍼"에만 한 번 부여
   const dialogRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function EditProfileModal() {
     })();
   }, []);
 
-  // ✅ 스크롤 복원 끄기 + 포커스 한 번만, 스크롤 없이
+  // 스크롤 복원 끄기 + 포커스 한 번만, 스크롤 없이
   useEffect(() => {
     const prev = (history as any).scrollRestoration;
     try {

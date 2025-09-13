@@ -86,10 +86,13 @@ export function initAuthFromStorage() {
   const t = localStorage.getItem(KEY);
   if (t) setAccessToken(t);
 }
-export function storeToken(t: string) {
-  if (typeof window !== 'undefined') localStorage.setItem(KEY, t);
-  setAccessToken(t);
+
+export function storeToken(token: string) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('accessToken', token);
+  setAccessToken(token);
 }
+
 export function clearToken() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(KEY);
@@ -125,7 +128,11 @@ export async function request<T = any>(config: AxiosRequestConfig): Promise<T> {
   return res.data as T;
 }
 
-// ===== Auth =====
+/* =========================
+ *         Auth
+ * ========================= */
+
+/** 로그인 */
 export async function login(email: string, password: string) {
   return request<{ accessToken: string }>({
     url: '/auth/login',
@@ -133,17 +140,60 @@ export async function login(email: string, password: string) {
     data: { email, password },
   });
 }
+
+/** (변경) 회원가입: 비밀번호 확인 포함 */
 export async function signUp(
   email: string,
   password: string,
+  passwordConfirm: string,
   displayName: string
 ) {
   return request<{ accessToken: string }>({
     url: '/auth/signUp',
     method: 'POST',
-    data: { email, password, displayName },
+    data: { email, password, passwordConfirm, displayName },
   });
 }
+
+/** OTP 요청: Lambda(Function URL) 호출 */
+export async function requestSignupCode(email: string) {
+  if (!ENV.OTP_FUNCTION_URL)
+    //throw new Error('OTP function URL is not configured');
+    throw new Error('OTP function URL is not configured');
+  const url = ENV.OTP_FUNCTION_URL.endsWith('/')
+    ? ENV.OTP_FUNCTION_URL
+    : ENV.OTP_FUNCTION_URL + '/';
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email, purpose: 'signup' }),
+  });
+
+  if (!res.ok) {
+    const data = await safeJson(res);
+    const msg =
+      data?.reason === 'cooldown' && typeof data?.cooldownRemainSec === 'number'
+        ? `잠시 후 다시 요청해주세요. 남은 시간: ${data.cooldownRemainSec}초`
+        : data?.error || '코드 전송에 실패했습니다.';
+    throw new Error(msg);
+  }
+
+  return (await res.json()) as { ok: true; cooldownRemainSec: number };
+}
+
+/** OTP 검증: 백엔드 API 호출 */
+export async function verifySignupCode(email: string, code: string) {
+  return request<{ ok: true }>({
+    url: '/auth/verify-code',
+    method: 'POST',
+    data: { email, code, purpose: 'signup' },
+  });
+}
+
+/* =========================
+ *       Upload / Media
+ * ========================= */
 
 /** presign */
 export async function presignUpload(
@@ -321,4 +371,22 @@ export async function avatarsComplete(key: string) {
     method: 'POST',
     data: { key },
   });
+}
+
+/** 이메일 가용성 체크 */
+export async function checkEmailAvailable(email: string) {
+  return request<{ available: boolean }>({
+    url: '/auth/email-available',
+    method: 'GET',
+    params: { email },
+  });
+}
+
+/** 유틸 */
+async function safeJson(res: Response) {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
 }

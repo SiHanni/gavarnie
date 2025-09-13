@@ -1,8 +1,3 @@
-//import FullPageFeed from '@/components/FullpageFeed';
-//
-//export default function Home() {
-//  return <FullPageFeed />;
-//}
 import { Suspense } from 'react';
 import FullPageFeed from '@/components/FullpageFeed';
 

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import TocClient from './TocClient'; // ✅ 추가
+import TocClient from './TocClient';
 
 export const metadata: Metadata = {
   title: 'Catarie – 약관 및 정책',
