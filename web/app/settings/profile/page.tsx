@@ -390,7 +390,7 @@ export default function EditProfileModal() {
                       fontSize: 'clamp(12px, 3.2vw, 14px)',
                     }}
                   >
-                    {uploading ? '업로드 중…' : '파일 선택'}
+                    {uploading ? '업로드 중…' : '이미지 선택'}
                   </button>
 
                   {file && !uploading && (

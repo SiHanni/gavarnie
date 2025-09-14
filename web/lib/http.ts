@@ -1,4 +1,4 @@
-import axios, { type AxiosRequestConfig } from 'axios';
+import axios, { AxiosError, type AxiosRequestConfig } from 'axios';
 import { ENV } from './env';
 import { UserGrade } from './user';
 
@@ -124,8 +124,40 @@ http.interceptors.response.use(
 
 // data 헬퍼
 export async function request<T = any>(config: AxiosRequestConfig): Promise<T> {
-  const res = await http.request<T>(config);
-  return res.data as T;
+  try {
+    const res = await http.request<T>(config);
+    return res.data as T;
+  } catch (e) {
+    const err = e as AxiosError<any>;
+    const data = err?.response?.data;
+
+    // NestJS 표준 { message, error, statusCode } 고려
+    const rawMsg = Array.isArray(data?.message)
+      ? data.message.join('\n')
+      : data?.message;
+    const friendly =
+      rawMsg ||
+      data?.error ||
+      err?.response?.statusText ||
+      err?.message ||
+      '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+
+    if ((err as any)?.isAxiosError) {
+      (err as any).message = String(friendly);
+      // 필요하면 친화적 메시지를 별도 필드로도 달아둠
+      (err as any).friendlyMessage = String(friendly);
+      throw err;
+    }
+
+    // AxiosError가 아닐 경우에도 최대한 호환 형태로 던지기
+    const ex: any = new Error(String(friendly));
+    ex.response = err?.response;
+    ex.config = err?.config;
+    ex.code = (err as any)?.code;
+    ex.isAxiosError = true;
+    ex.friendlyMessage = String(friendly);
+    throw ex;
+  }
 }
 
 /* =========================
@@ -350,18 +382,27 @@ export async function avatarsPresign(input: {
   fileSize?: number;
   originalFilename?: string;
 }) {
-  return request<{
-    url: string;
-    method: 'PUT';
-    headers: Record<string, string>;
-    key: string;
-    expiresIn: number;
-    publicUrl: string | null;
-  }>({
-    url: '/avatars/presign',
-    method: 'POST',
-    data: input,
-  });
+  try {
+    return request<{
+      url: string;
+      method: 'PUT';
+      headers: Record<string, string>;
+      key: string;
+      expiresIn: number;
+      publicUrl: string | null;
+    }>({
+      url: '/avatars/presign',
+      method: 'POST',
+      data: input,
+    });
+  } catch (e: any) {
+    const data = e?.response?.data;
+    const rawMsg = Array.isArray(data?.message)
+      ? data.message.join('\n')
+      : data?.message;
+    const msg = rawMsg || '잠시 후 다시 시도해 주세요.';
+    throw Object.assign(new Error(msg), { ...e });
+  }
 }
 
 // --- 아바타 업로드 완료 ---
