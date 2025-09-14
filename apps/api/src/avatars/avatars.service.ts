@@ -30,6 +30,21 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
   });
 }
 
+function pad(n: number, w = 2) {
+  const s = String(n);
+  return s.length >= w ? s : '0'.repeat(w - s.length) + s;
+}
+// UTC 기준 yyyymmddHHMMss
+function makeVersionStamp(date = new Date()) {
+  const y = date.getUTCFullYear();
+  const m = pad(date.getUTCMonth() + 1);
+  const d = pad(date.getUTCDate());
+  const H = pad(date.getUTCHours());
+  const M = pad(date.getUTCMinutes());
+  const S = pad(date.getUTCSeconds());
+  return `${y}${m}${d}${H}${M}${S}`;
+}
+
 @Injectable()
 export class AvatarsService {
   private readonly logger = new Logger(AvatarsService.name);
@@ -105,7 +120,10 @@ export class AvatarsService {
     return presigned; // { url, method, headers, key, bucket, publicUrl, expiresIn, driver }
   }
 
-  /** complete: 원본 확인 → 리사이즈 → 이전 public 삭제 → 새 public 저장 → 원본 삭제 → URL 반환 */
+  /**
+   * complete (버전 디렉터리 방식):
+   * 원본 확인 → 변형 생성 업로드(새 버전) → DB 갱신 → 이전 버전 정리 → 원본 삭제 → URL 반환
+   */
   async complete(userId: string, key: string) {
     // 1) 원본 확인/크기
     const head = await this.s3.headObject(key);
@@ -118,11 +136,11 @@ export class AvatarsService {
     const obj = await this.s3.getObject(key);
     const rawBuf = await streamToBuffer(obj.Body as NodeJS.ReadableStream);
 
-    // 3) 이전 public/* 삭제
-    await this.deleteAllPublicVariants(userId);
-
-    // 4) 새 변형 생성 & 업로드
+    // 3) 새 변형 생성 & 업로드 (버전 디렉터리 사용)
+    const version = makeVersionStamp(new Date());
+    const basePrefix = `public/${userId}/${version}/`;
     const outs: string[] = [];
+
     for (const s of this.sizes) {
       const buf = await sharp(rawBuf)
         .rotate()
@@ -130,7 +148,7 @@ export class AvatarsService {
         .webp({ quality: 90 })
         .toBuffer();
 
-      const outKey = `public/${userId}/avatar_${s}.webp`;
+      const outKey = `${basePrefix}avatar_${s}.webp`;
       await this.s3.putObject({
         key: outKey,
         body: buf,
@@ -140,34 +158,49 @@ export class AvatarsService {
       outs.push(outKey);
     }
 
-    // 5) 원본 삭제
-    await this.safeDeleteObject(key);
-
-    // 6) 대표 URL + 캐시버스터 (전용 서비스의 publicUrlFor 사용)
+    // 대표 URL: 가장 큰 사이즈 기준, 쿼리스트링 없이(경로 자체가 버전 포함)
     const maxSize = Math.max(...this.sizes);
-    const bestKey = `public/${userId}/avatar_${maxSize}.webp`;
-    const version = Date.now();
-    const bestUrl = `${this.s3.publicUrlFor(bestKey)}?v=${version}`;
+    const bestKey = `${basePrefix}avatar_${maxSize}.webp`;
+    const bestUrl = this.s3.publicUrlFor(bestKey);
 
-    // 7) DB 업데이트
+    // 4) DB 업데이트 (새 버전 경로 반영)
     await this.users.update(
       { id: userId },
       { avatarUrl: bestUrl, avatarUpdatedAt: new Date() },
     );
 
+    // 5) 이전 버전들 정리(현재 버전 디렉터리는 보존)
+    await this.deleteOldVersions(userId, version);
+
+    // 6) 원본 삭제 (성공/실패와 무관하게 시도)
+    await this.safeDeleteObject(key);
+
+    // 7) 응답
     return {
       ok: true,
       avatarUrl: bestUrl,
-      variants: outs.map((k) => `${this.s3.publicUrlFor(k)}?v=${version}`),
+      variants: outs.map((k) => this.s3.publicUrlFor(k)),
+      version,
     };
   }
 
-  /** public/{userId}/ 아래 기존 파일 전부 삭제 */
-  private async deleteAllPublicVariants(userId: string) {
-    const prefix = `public/${userId}/`;
-    const keys = await this.s3.listKeys(prefix);
-    if (keys.length === 0) return;
-    await this.s3.deleteObjects(keys);
+  /**
+   * 현재 버전 디렉터리를 제외하고 public/{userId}/ 이하의 나머지 파일/디렉터리를 정리
+   */
+  private async deleteOldVersions(userId: string, keepVersion: string) {
+    const rootPrefix = `public/${userId}/`;
+    const allKeys = await this.s3.listKeys(rootPrefix);
+    if (allKeys.length === 0) return;
+
+    const keepPrefix = `${rootPrefix}${keepVersion}/`;
+    const toDelete = allKeys.filter((k) => !k.startsWith(keepPrefix));
+
+    if (toDelete.length > 0) {
+      this.logger.log(
+        `[avatars.cleanup] user=${userId} delete=${toDelete.length} keepVersion=${keepVersion}`,
+      );
+      await this.s3.deleteObjects(toDelete);
+    }
   }
 
   private async safeDeleteObject(key: string) {

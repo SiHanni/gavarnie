@@ -16,7 +16,7 @@ export default function EditProfileModal() {
   const router = useRouter();
 
   const [displayName, setDisplayName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState(''); // 서버에 저장되는 최종 URL
+  const [avatarUrl, setAvatarUrl] = useState(''); // 서버가 주는 "버전 포함" 최종 URL
   const [statusMessage, setStatusMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -29,10 +29,10 @@ export default function EditProfileModal() {
   const [myHandle, setMyHandle] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // 프리뷰 캐시버스터
-  const [previewNonce, setPreviewNonce] = useState<number>(0);
+  // 최초 서버 값(버튼 노출 판단용)
+  const [initialAvatarUrl, setInitialAvatarUrl] = useState<string>('');
 
-  // 모달 포커스는 "카드 래퍼"에만 한 번 부여
+  // 모달 포커스
   const dialogRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
@@ -41,30 +41,26 @@ export default function EditProfileModal() {
         const me = await fetchProfile();
         setDisplayName(me.displayName ?? '');
         setAvatarUrl(me.avatarUrl ?? '');
+        setInitialAvatarUrl(me.avatarUrl ?? '');
         setStatusMessage(me.statusMessage ?? '');
         setMyHandle(me.handle ?? null);
-        setPreviewNonce(Date.now());
       } catch (e: any) {
         setErr(e?.message || '프로필 정보를 불러오지 못했습니다.');
       }
     })();
   }, []);
 
-  // 스크롤 복원 끄기 + 포커스 한 번만, 스크롤 없이
+  // 스크롤 복원/포커스
   useEffect(() => {
     const prev = (history as any).scrollRestoration;
     try {
       history.scrollRestoration = 'manual';
     } catch {}
-
     const raf = requestAnimationFrame(() => {
-      const alreadyInside =
-        dialogRef.current && dialogRef.current.contains(document.activeElement);
-      if (!alreadyInside) {
-        dialogRef.current?.focus({ preventScroll: true });
-      }
+      const inside =
+        dialogRef.current?.contains(document.activeElement) ?? false;
+      if (!inside) dialogRef.current?.focus({ preventScroll: true });
     });
-
     return () => {
       cancelAnimationFrame(raf);
       try {
@@ -73,7 +69,7 @@ export default function EditProfileModal() {
     };
   }, []);
 
-  // ESC로 닫기 (기존 흐름 유지)
+  // ESC로 닫기
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeModal();
@@ -82,10 +78,16 @@ export default function EditProfileModal() {
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  // 파일 선택
+  /**
+   * 변경사항:
+   * - 서버 complete()가 DB에 최신 버전 URL을 이미 저장하므로,
+   *   여기서 따로 updateMyProfile({ avatarUrl })를 호출하지 않습니다.
+   * - complete()의 avatarUrl(버전 포함 경로)을 그대로 사용합니다. (쿼리스트링 캐시버스터 제거)
+   */
   const onPickFile: React.ChangeEventHandler<HTMLInputElement> = async e => {
     const f = e.target.files?.[0] ?? null;
     setUploadErr(null);
+
     if (!f) {
       setFile(null);
       return;
@@ -103,43 +105,63 @@ export default function EditProfileModal() {
 
     setFile(f);
 
-    // 선택 즉시 업로드 (presign → PUT → complete)
     try {
       setUploading(true);
 
+      // 1) presign
       const presign = await avatarsPresign({
         contentType: f.type || undefined,
         fileSize: f.size,
         originalFilename: f.name,
-      });
+      }); // { url, method:'PUT', headers, key, publicUrl? }
+
+      // 2) S3 PUT (presign.headers 그대로, 바디는 Blob)
+      const headers: Record<string, string> = { ...(presign.headers || {}) };
+      const hasCT = Object.keys(headers).some(
+        k => k.toLowerCase() === 'content-type'
+      );
+      if (!hasCT && f.type) headers['Content-Type'] = f.type;
 
       const put = await fetch(presign.url, {
-        method: presign.method,
-        headers: presign.headers,
-        body: await f.arrayBuffer(),
+        method: presign.method || 'PUT',
+        headers,
+        body: f, // ✅ Blob
       });
-      if (!put.ok) throw new Error(`업로드 실패(${put.status})`);
 
+      if (!put.ok) {
+        const text = await safeReadText(put);
+        throw new Error(
+          `S3 업로드 실패 ${put.status}${text ? `: ${text}` : ''}`
+        );
+      }
+
+      // 3) 완료 통지 → 서버가 최종 경로(버전 포함 avatarUrl)를 돌려줌
       const done = await avatarsComplete(presign.key);
+      const canonicalUrl = done.avatarUrl || presign.publicUrl || '';
 
-      // 서버에서 확정한 최종 URL을 상태에 반영
-      setAvatarUrl(done.avatarUrl);
+      // 4) 로컬 상태/캐시 갱신 (DB는 서버에서 이미 반영됨)
+      setAvatarUrl(canonicalUrl);
+      setInitialAvatarUrl(canonicalUrl);
 
-      // 미리보기는 캐시를 강제로 우회해서 즉시 반영
-      setPreviewNonce(Date.now());
+      // 로컬 프로필 캐시도 즉시 갱신하여 헤더/프로필 등 반영
+      const normalized: UserProfile = {
+        // 서버 DB에는 이미 반영되었으나, 로컬 캐시/이벤트로 즉시 UI 동기화
+        displayName,
+        statusMessage,
+        avatarUrl: canonicalUrl,
+        handle: myHandle ?? undefined,
+      } as any;
+      saveUserProfile(normalized);
+      window.dispatchEvent(
+        new CustomEvent('auth:login', { detail: normalized })
+      );
 
       // 인풋 초기화
       if (fileInputRef.current) fileInputRef.current.value = '';
       setFile(null);
     } catch (e: any) {
-      const status: number | undefined =
-        e?.response?.status ?? e?.status ?? e?.code;
-
-      if (status === 429 || status === 400) {
-        setUploadErr('너무 자주 변경하셨어요. 10초 뒤 다시 시도해주세요.');
-      } else {
-        setUploadErr(e?.message || '이미지 업로드에 실패했어요.');
-      }
+      setUploadErr(e?.message || '이미지 업로드에 실패했어요.');
+      console.error('[AvatarUploadError]', e);
     } finally {
       setUploading(false);
     }
@@ -151,18 +173,42 @@ export default function EditProfileModal() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // 프리뷰 src: avatarUrl + 캐시버스터
-  const previewSrc = useMemo(() => {
-    if (!avatarUrl) return '';
-    const join = avatarUrl.includes('?') ? '&' : '?';
-    return `${avatarUrl}${join}t=${previewNonce}`;
-  }, [avatarUrl, previewNonce]);
+  /** 기본 이미지(= null)로 즉시 전환 (DB 반영) */
+  const onClickDefaultAvatar = async () => {
+    if (uploading) return;
+    try {
+      setUploading(true);
+      const updated = await updateMyProfile({ avatarUrl: null });
+      setAvatarUrl('');
+      setInitialAvatarUrl('');
+      clearSelected();
+
+      const normalized: UserProfile = {
+        ...updated,
+        avatarUrl: undefined,
+        handle: updated.handle ?? undefined,
+      };
+      saveUserProfile(normalized);
+      window.dispatchEvent(
+        new CustomEvent('auth:login', { detail: normalized })
+      );
+    } catch (e: any) {
+      setUploadErr(e?.message || '기본 이미지로 전환에 실패했어요.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // 프리뷰 src:
+  // 버전 포함 URL이므로 추가 캐시버스터가 필요 없습니다.
+  const previewSrc = useMemo(() => avatarUrl || '', [avatarUrl]);
 
   const closeModal = () => {
     if (myHandle && myHandle.trim()) router.push(`/@${myHandle}`);
     else router.push('/');
   };
 
+  // 저장 버튼: 닉네임/상태메시지만 처리(아바타는 업로드 완료 시점에 이미 반영)
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -170,18 +216,19 @@ export default function EditProfileModal() {
     try {
       const res = await updateMyProfile({
         displayName: displayName.trim(),
-        avatarUrl: avatarUrl?.trim() || null,
         statusMessage: statusMessage.trim() || null,
       });
 
       const normalized: UserProfile = {
         ...res,
+        avatarUrl: res.avatarUrl || undefined,
         handle: res.handle ?? undefined,
       };
       saveUserProfile(normalized);
       window.dispatchEvent(
         new CustomEvent('auth:login', { detail: normalized })
       );
+
       closeModal();
     } catch (e: any) {
       setErr(e?.message || '저장 실패');
@@ -189,6 +236,8 @@ export default function EditProfileModal() {
       setSaving(false);
     }
   };
+
+  const hasAnyAvatar = Boolean(initialAvatarUrl || avatarUrl);
 
   return (
     <div
@@ -203,7 +252,7 @@ export default function EditProfileModal() {
         aria-hidden
       />
 
-      {/* 모달 카드 (tabIndex로 포커스 가능하게) */}
+      {/* 모달 카드 */}
       <form
         ref={dialogRef}
         tabIndex={-1}
@@ -211,13 +260,12 @@ export default function EditProfileModal() {
         className='relative z-[9999] overflow-hidden border border-white/10 bg-neutral-950 text-white shadow-2xl'
         onClick={e => e.stopPropagation()}
         style={{
-          // ✅ 모바일(270px 폭)에서도 넘치지 않게 최소폭 낮춤
           width: 'clamp(240px, 92vw, 560px)',
           maxHeight: '92vh',
           borderRadius: 'clamp(12px, 3.5vw, 18px)',
         }}
       >
-        {/* 헤더: 동일 그라데이션 */}
+        {/* 헤더 */}
         <div
           className='relative'
           style={{
@@ -362,6 +410,26 @@ export default function EditProfileModal() {
                       선택 해제
                     </button>
                   )}
+
+                  {/* 기존/현재 아바타가 있을 때만 노출 */}
+                  {hasAnyAvatar && !uploading && (
+                    <button
+                      type='button'
+                      onClick={onClickDefaultAvatar}
+                      className='font-semibold'
+                      title='기본 이미지로 되돌리기'
+                      style={{
+                        paddingInline: 'clamp(9px, 3.2vw, 14px)',
+                        paddingBlock: 'clamp(7px, 2.4vw, 10px)',
+                        borderRadius: '12px',
+                        backgroundColor: 'transparent',
+                        border: '1px solid rgba(255,255,255,0.16)',
+                        fontSize: 'clamp(12px, 3.2vw, 14px)',
+                      }}
+                    >
+                      기본 이미지
+                    </button>
+                  )}
                 </div>
 
                 {/* 파일 안내/에러 */}
@@ -428,13 +496,13 @@ export default function EditProfileModal() {
             </p>
           )}
 
-          {/* 액션: 한 줄 [저장][취소] */}
+          {/* 액션 */}
           <div
             className='flex items-center'
             style={{
               marginTop: 'clamp(12px, 3.6vw, 18px)',
               gap: 'clamp(6px, 2vw, 10px)',
-              paddingBottom: 'clamp(4px, 2.4vw, 8px)', // ✅ 작은 화면에서 마지막 버튼이 가리지 않게
+              paddingBottom: 'clamp(4px, 2.4vw, 8px)',
             }}
           >
             <button
@@ -473,4 +541,15 @@ export default function EditProfileModal() {
       </form>
     </div>
   );
+}
+
+/** 실패 원인 파악을 위해 응답 본문을 안전하게 읽는 헬퍼 */
+async function safeReadText(res: Response) {
+  try {
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('text') || ct.includes('json') || ct.includes('xml')) {
+      return await res.text();
+    }
+  } catch {}
+  return '';
 }

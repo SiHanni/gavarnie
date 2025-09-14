@@ -48,7 +48,7 @@ export class AvatarsS3Service {
       (process.env.NODE_ENV === 'production' ? 's3' : 'minio');
     this.driver = driverEnv === 's3' ? 's3' : 'minio';
 
-    // ✅ 아바타 전용 버킷: STORAGE_BUCKET_AVATARS → AVATAR_BUCKET → 기본
+    // 아바타 전용 버킷: STORAGE_BUCKET_AVATARS → AVATAR_BUCKET → 기본
     this.bucket =
       this.config.get<string>('STORAGE_BUCKET_AVATARS') ??
       this.config.get<string>('AVATAR_BUCKET') ??
@@ -162,6 +162,7 @@ export class AvatarsS3Service {
 
   /** Prefix로 키 나열 */
   async listKeys(prefix: string): Promise<string[]> {
+    // 참고: 오브젝트 수가 아주 많아지면 pagination 필요
     const res = await this.s3.send(
       new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix }),
     );
