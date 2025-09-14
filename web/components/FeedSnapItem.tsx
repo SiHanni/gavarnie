@@ -14,6 +14,7 @@ import Avatar from '@/components/Avatar';
 import { useMediaLike } from '@/hooks/useMediaLike';
 import { useShareModal } from '@/contexts/ShareModalContext';
 import ProgressBar from '@/components/ProgressBar';
+import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { useCommentsPanel } from '@/contexts/CommentsPanelContext';
 import FollowButton from '@/components/FollowButton';
 
@@ -66,8 +67,9 @@ export default function FeedSnapItem({
 
   const [visible, setVisible] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(true);
-  const [volume, setVolume] = useState(0.7);
+  //const [muted, setMuted] = useState(true);
+  //const [volume, setVolume] = useState(0.7);
+  const { muted, setMuted, toggleMuted, volume, setVolume } = useGlobalAudio();
 
   // 볼륨 패널
   const [volOpen, setVolOpen] = useState(false);
@@ -180,7 +182,7 @@ export default function FeedSnapItem({
       setPlaying(false);
     }
   };
-  const toggleMute = () => setMuted(v => !v);
+  //const toggleMute = () => setMuted(v => !v);
 
   const onMediaToggle = () => {
     if (audioKind && muted) setMuted(false);
@@ -360,7 +362,8 @@ export default function FeedSnapItem({
                   <button
                     onPointerUp={e => {
                       e.stopPropagation();
-                      toggleMute();
+                      //toggleMute();
+                      toggleMuted(); // 전역 관리
                     }}
                     className='grid place-items-center p-1'
                     aria-label={muted ? '음소거 해제' : '음소거'}

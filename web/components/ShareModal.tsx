@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useShareModal } from '@/contexts/ShareModalContext';
 
 const ACCENT = '#5a319f';

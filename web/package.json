@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3100",
     "lint": "next lint",
-    "export": "next export"
+    "export": "next export",
+    "check:unused": "ts-prune"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.50.0",
@@ -27,6 +28,7 @@
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.7",
+    "ts-prune": "^0.10.3",
     "typescript": "^5.5.4"
   }
 }
