@@ -223,7 +223,7 @@ export default function AuthModal() {
       aria-modal='true'
       className='fixed inset-0 z-[9999] grid place-items-center'
     >
-      {/* 밖 클릭으로 닫히지 않음 */}
+      {/* 어두운 배경 */}
       <div className='fixed inset-0 z-[9998] bg-black/70' aria-hidden='true' />
 
       <form
@@ -234,6 +234,7 @@ export default function AuthModal() {
                    bg-neutral-950/90 shadow-[0_10px_40px_rgba(0,0,0,0.6)]'
         style={{
           width: 'clamp(320px, 92vw, 560px)',
+          maxWidth: 'calc(100svw - 16px)', // 극단적 소형 기기에서도 안전
           borderRadius: 'clamp(14px, 3.5vw, 18px)',
         }}
       >
@@ -288,8 +289,13 @@ export default function AuthModal() {
             >
               이메일
             </span>
-            <div className='mt-1 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2'>
-              {/* decoy */}
+
+            {/* ✅ overflow 방지: flex-wrap + 유연한 너비 제어 */}
+            <div
+              className='mt-1 flex flex-wrap items-center gap-2'
+              style={{ rowGap: 8, maxWidth: '100%' }}
+            >
+              {/* decoy (자동완성 회피) */}
               <input
                 type='text'
                 name='decoy_user'
@@ -303,9 +309,11 @@ export default function AuthModal() {
                 }}
                 aria-hidden='true'
               />
+
+              {/* local-part */}
               <input
                 className='rounded-lg bg-neutral-900/80 border border-neutral-700/70 outline-none text-white caret-white placeholder:text-white/40
-                           focus:ring-2 focus:ring-[#5a319f] focus:border-[#5a319f]'
+                           focus:ring-2 focus:ring-[#5a319f] focus:border-[#5a319f] min-w-0'
                 type='text'
                 inputMode='email'
                 autoComplete='off'
@@ -318,9 +326,19 @@ export default function AuthModal() {
                   height: 'clamp(40px, 8.5vw, 46px)',
                   fontSize: 'clamp(13px, 3.6vw, 15px)',
                   paddingInline: 'clamp(10px, 3.6vw, 12px)',
+                  flex: '1 1 160px', // 기본 160px, 남으면 늘어남
+                  maxWidth: '100%',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                 }}
               />
-              <span className='text-white/70'>@</span>
+
+              {/* @ */}
+              <span className='text-white/70' style={{ flex: '0 0 auto' }}>
+                @
+              </span>
+
+              {/* domain select */}
               <select
                 className='rounded-lg bg-neutral-900/80 border border-neutral-700/70 outline-none text-white focus:ring-2 focus:ring-[#5a319f] focus:border-[#5a319f]'
                 value={emailDomain}
@@ -339,10 +357,12 @@ export default function AuthModal() {
                 ))}
                 <option value='직접입력'>직접입력</option>
               </select>
+
+              {/* custom domain (선택 시만) */}
               {emailDomain === '직접입력' && (
                 <input
                   className='rounded-lg bg-neutral-900/80 border border-neutral-700/70 outline-none text-white placeholder:text-white/40
-                             focus:ring-2 focus:ring-[#5a319f] focus:border-[#5a319f]'
+                             focus:ring-2 focus:ring-[#5a319f] focus:border-[#5a319f] min-w-0'
                   type='text'
                   autoComplete='off'
                   name={`email_domain_custom_${nonce}`}
@@ -354,6 +374,11 @@ export default function AuthModal() {
                     height: 'clamp(40px, 8.5vw, 46px)',
                     fontSize: 'clamp(13px, 3.6vw, 15px)',
                     paddingInline: 'clamp(10px, 3.6vw, 12px)',
+                    flex: '1 1 170px',
+                    minWidth: 120,
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
                 />
               )}
