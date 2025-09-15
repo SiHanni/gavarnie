@@ -34,6 +34,7 @@ async function createDataSource() {
 }
 
 /**
+ * DEPRECATED : worker.runner 로 대체
  * 목적: BullMQ 'transcode' 큐 컨슈머.
  * 동작: media 상태를 PROCESSING→READY/FAILED로 갱신 + 썸네일 생성/반영
  */
