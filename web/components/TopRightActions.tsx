@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAuthModal } from '@/contexts/AuthModalContext';
-import { hasStoredToken, getAccessToken } from '@/lib/http';
-import { loadUserProfile, type UserProfile } from '@/lib/user';
+import { getAccessToken } from '@/lib/http';
 import { useUploadModal } from '@/contexts/UploadModalContext';
 import { usePathname } from 'next/navigation';
 

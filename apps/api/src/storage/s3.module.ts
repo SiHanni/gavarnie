@@ -11,7 +11,6 @@ export const S3_CLIENT = Symbol('S3_CLIENT');
       provide: S3_CLIENT,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        // 드라이버 결정: 명시적 설정 우선, 없으면 NODE_ENV로 추론
         // dev → minio, production → s3
         const driver =
           config.get<string>('STORAGE_DRIVER') ??
