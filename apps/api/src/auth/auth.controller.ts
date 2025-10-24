@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Post,
   Query,
   Req,
@@ -12,6 +13,9 @@ import {
   ApiOperation,
   ApiOkResponse,
   ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiForbiddenResponse,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
@@ -20,6 +24,7 @@ import {
   MyProfileDto,
   VerifyCodeDto,
   EmailAvailableQueryDto,
+  UpdatePasswordDto,
 } from './dto';
 import { JwtAuthGuard } from './jwt/jwt-auth.guard';
 import { UsersService } from '../users/users.service';
@@ -94,5 +99,14 @@ export class AuthController {
   @ApiOkResponse({ schema: { example: { available: true } } })
   emailAvailable(@Query() q: EmailAvailableQueryDto) {
     return this.auth.emailAvailable(q.email);
+  }
+
+  @Patch('users/password')
+  @ApiOperation({ summary: '관리자: 특정 사용자 비밀번호 수정' })
+  @ApiNoContentResponse({ description: '변경 성공 (본문 없음)' })
+  @ApiNotFoundResponse({ description: '사용자 없음' })
+  @ApiForbiddenResponse({ description: '관리자 전용' })
+  async updatePassword(@Body() dto: UpdatePasswordDto): Promise<void> {
+    await this.auth.updateUserPasswordForAdmin(dto.email, dto.password);
   }
 }
