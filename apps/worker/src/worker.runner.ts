@@ -1,4 +1,3 @@
-// apps/worker/src/worker.runner.ts
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -158,7 +157,7 @@ export class WorkerRunner implements OnModuleInit, OnModuleDestroy {
       {
         connection: this.redis,
         prefix: 'bull',
-        concurrency: 1,
+        concurrency: 3,
       },
     );
 

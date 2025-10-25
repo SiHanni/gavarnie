@@ -1,22 +1,17 @@
 import {
   BadRequestException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { OtpService } from './otp.service';
-import * as bcrypt from 'bcrypt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@catarie/entities';
-import { Repository } from 'typeorm';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
     private users: UsersService,
     private jwt: JwtService,
     private otp: OtpService,
@@ -68,16 +63,5 @@ export class AuthService {
   async emailAvailable(email: string) {
     const u = await this.users.findByEmail?.(email);
     return { available: !u };
-  }
-
-  async updateUserPasswordForAdmin(
-    email: string,
-    password: string,
-  ): Promise<void> {
-    const user = await this.users.findByEmail?.(email);
-    if (!user) throw new NotFoundException('User not found');
-
-    const passwordHash = await bcrypt.hash(password, 12);
-    await this.userRepository.update({ email }, { passwordHash });
   }
 }

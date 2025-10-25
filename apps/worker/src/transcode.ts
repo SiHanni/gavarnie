@@ -235,6 +235,8 @@ export async function transcodeToHLSAndThumbnails(
           .outputOptions([
             '-preset',
             'veryfast',
+            '-threads',
+            '0',
             '-movflags',
             '+faststart',
             '-g',

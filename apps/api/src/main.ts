@@ -17,7 +17,12 @@ import pino from 'pino';
 import { createLogger } from '@catarie/logging';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { logger: false });
+  const isDev = process.env.NODE_ENV === 'development';
+  const app = await NestFactory.create(AppModule, {
+    logger: isDev ? ['log', 'error', 'warn', 'debug', 'verbose'] : false,
+    bufferLogs: isDev,
+  });
+
   app.use(httpLoggerMiddleware('api'));
 
   const logger: pino.Logger = createLogger('api');

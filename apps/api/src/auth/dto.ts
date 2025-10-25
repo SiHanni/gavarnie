@@ -71,18 +71,3 @@ export class EmailAvailableQueryDto {
   @IsEmail()
   email!: string;
 }
-
-export class UpdatePasswordDto {
-  @ApiProperty({ example: 'user@example.com', description: '사용자 이메일' })
-  @IsEmail()
-  email!: string;
-
-  @ApiProperty({
-    description: '새 비밀번호',
-    minLength: 6,
-    example: 'Qwer!23456',
-  })
-  @IsString()
-  @MinLength(6)
-  password!: string;
-}
