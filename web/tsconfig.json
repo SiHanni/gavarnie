@@ -13,7 +13,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"] // '@/lib/…' 식으로 깔끔히 임포트하기 위함
     },
