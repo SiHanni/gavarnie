@@ -1,6 +1,5 @@
 <img src="./images/logo_v2.png" alt="메인 로고" width="300"/>
-
-https://github.com/SiHanni/gavarnie/issues/2#issue-3693058405
+https://github.com/user-attachments/assets/0baeaa71-3330-43ab-be03-2a4ca49f1f35
 
 #### 영상,음원 소셜 네트워크 프로젝트 "Catarie"
 
