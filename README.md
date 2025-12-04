@@ -4,6 +4,8 @@
 
 ![catarie (1) (1) (1) (1) (1)](https://github.com/user-attachments/assets/9771fae9-a571-4633-8203-6f8b7106d50f)
 
+#### 회고 글
+https://sihanni.tistory.com/258
 
 #### 영상,음원 소셜 네트워크 프로젝트 "Catarie"
 
