@@ -1,5 +1,7 @@
 <img src="./images/logo_v2.png" alt="메인 로고" width="300"/>
-https://github.com/user-attachments/assets/0baeaa71-3330-43ab-be03-2a4ca49f1f35
+
+![catarie (1) (1) (1) (1) (1)](https://github.com/user-attachments/assets/9771fae9-a571-4633-8203-6f8b7106d50f)
+
 
 #### 영상,음원 소셜 네트워크 프로젝트 "Catarie"
 
