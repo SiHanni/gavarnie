@@ -1,5 +1,7 @@
 <img src="./images/logo_v2.png" alt="메인 로고" width="300"/>
 
+https://github.com/SiHanni/gavarnie/issues/2#issue-3693058405
+
 #### 영상,음원 소셜 네트워크 프로젝트 "Catarie"
 
 이 서비스의 이름인 Catarie는 “Cataract”(큰 폭포)에서 영감을 얻었습니다.
