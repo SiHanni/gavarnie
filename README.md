@@ -1,5 +1,7 @@
 <img src="./images/logo_v2.png" alt="메인 로고" width="300"/>
 
+#### 시연 영상
+
 ![catarie (1) (1) (1) (1) (1)](https://github.com/user-attachments/assets/9771fae9-a571-4633-8203-6f8b7106d50f)
 
 
